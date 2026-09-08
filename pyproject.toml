@@ -1,0 +1,25 @@
+[project]
+name = "embody"
+version = "0.1.0"
+description = "ACN agents get a body. Microduck is the first adapter, not the platform."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "ACN Labs" }]
+
+[project.scripts]
+embody = "embody.cli:main"
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["embody*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
