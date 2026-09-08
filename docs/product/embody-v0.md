@@ -51,13 +51,13 @@ One joined agent → many bodies. Each body → many Hub policies and its own se
 
 Any slug kind can be added. Session commands dispatch by `kind`. Only `microduck` has an adapter today (`microduck-skill`). Other kinds store the body and policies; `session` fails until an adapter exists. The Microduck adapter also refuses a second localhost sim — adapter limit, not a kernel rule.
 
-Join does not attach a body. `whoami` only binds this machine to an `agent_id`.
+Join does not attach a body. `whoami` only binds this machine to an `agent_id`. A body is a machine type (`kind`), not a sim/real split. Sim vs robot is session `venue` — see [body-runtime-v0.md](./body-runtime-v0.md). v0 sessions are `venue=sim`.
 
 ## Objects
 
 | Object | `asset_ref` | `asset_kind` | Meaning |
 |---|---|---|---|
-| Body | `embody:body:{id}` | `body` | A sim/hardware slot. `kind` is a slug (`microduck`, later others). |
+| Body | `embody:body:{id}` | `body` | A machine-type slot (`kind` slug). Sim and robot share this body; they are session venues. |
 | Policy | `embody:policy:{id}` | `policy` | Pointer at a Hub graph (`policy.onnx`). One trick, one graph. |
 
 Registerable on AgentPlanet. Not Store-listable in v0. Policy preview: `https://huggingface.co/{repo}/resolve/main/preview.mp4`. A raw `/resolve/main/` click downloads; play the clip on the model card.
