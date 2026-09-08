@@ -24,15 +24,17 @@ v0 does not change the ACN protocol. Embody only consumes an `agent_id` from `PO
 ```text
 ACN                identity / messages / tasks / wallet
 AgentPlanet        launch / Credits / embed / asset registry
-embody             claim a body, attach Hub policies, run a studio session
-microduck-plugin   first body adapter — not this platform
+embody             bind agent, many bodies, studio, registry payload
+body runtime       session verbs + Hub cards — docs/product/body-runtime-v0.md
+microduck-plugin   first kind pack — not the platform
 ```
 
 ```text
 ACN agent
-  → claim on embody
-  → studio
-  → microduck-plugin
+  → whoami (bind this machine)
+  → body add (many kinds)
+  → studio session (runtime verbs)
+  → kind pack (microduck-skill today)
        → Hub policy
        → localhost sim
   → AgentPlanet registry (source=embody)
@@ -45,15 +47,17 @@ ACN agent
 
 ## Cardinality
 
-One joined agent ↔ one body (`kind=microduck`) ↔ several Hub policies ↔ one studio sim session.
+One joined agent → many bodies. Each body → many Hub policies and its own session. Sessions are not globally exclusive.
 
-Join does not attach a body.
+Any slug kind can be added. Session commands dispatch by `kind`. Only `microduck` has an adapter today (`microduck-skill`). Other kinds store the body and policies; `session` fails until an adapter exists. The Microduck adapter also refuses a second localhost sim — adapter limit, not a kernel rule.
+
+Join does not attach a body. `whoami` only binds this machine to an `agent_id`.
 
 ## Objects
 
 | Object | `asset_ref` | `asset_kind` | Meaning |
 |---|---|---|---|
-| Body | `embody:body:{id}` | `body` | Claimed sim/hardware slot. First kind: `microduck`. |
+| Body | `embody:body:{id}` | `body` | A sim/hardware slot. `kind` is a slug (`microduck`, later others). |
 | Policy | `embody:policy:{id}` | `policy` | Pointer at a Hub graph (`policy.onnx`). One trick, one graph. |
 
 Registerable on AgentPlanet. Not Store-listable in v0. Policy preview: `https://huggingface.co/{repo}/resolve/main/preview.mp4`. A raw `/resolve/main/` click downloads; play the clip on the model card.
@@ -65,40 +69,26 @@ Local state: `$EMBODY_HOME` (default `~/.embody/state.json`). That file is not t
 | Verb | v0 |
 |---|---|
 | Train | Adapter only. No trainer in this kernel. |
-| Manage | Claim, body register, policy attach / list. |
-| Control | Session start / pull / do / status / stop via the adapter. |
+| Manage | `whoami`, `body add` / `list`, policy attach / list. |
+| Control | Session start / pull / do / status / stop per body. |
 | Show | Card fields + Hub preview URL. Body card reports numbers only. |
 
 Datacollect and real-robot lines stay in the adapter. Real-robot commands print by default. JSONL does not enter official PPO.
 
-## First adapter: Microduck
+## Body runtime
 
-Embody calls [microduck-skill](https://github.com/acnlabs/microduck-plugin) scripts. It does not reimplement PPO, ONNX export, or `robotctl`.
+Contract: [body-runtime-v0.md](./body-runtime-v0.md). Kernel dispatches `start` / `pull` / `do` / `status` / `stop` by `kind`. It does not call `control.sh`.
 
-| Session | Adapter |
-|---|---|
-| `start` | `control.sh start --repo … --detach` (perpetual only) |
-| `pull --as` | `control.sh pull USER/REPO --as alias` |
-| `do` | `control.sh do alias` |
-| `status` / `stop` | `control.sh status` / `stop` |
-
-Skill path: `EMBODY_MICRODUCK_SKILL`, then sibling `../microduck-plugin/skills/microduck-skill`, then `~/.agents/skills/microduck-skill` or `~/.cursor/skills/microduck-skill`.
-
-| Policy | Hub | How |
+| `kind` | Pack | Session |
 |---|---|---|
-| walk | `neil-jo/microduck-walk` | `start --repo` |
-| polite-bow | `neil-jo/microduck-polite-bow` | `pull --as` then `do` |
+| `microduck` | [microduck-skill](https://github.com/acnlabs/microduck-plugin) | pack maps verbs → `control.sh` |
+| anything else | none | body + cards ok; session errors |
 
-Do not `start --repo` an episodic graph. These Hub graphs are not bundled and not official Pollen weights.
+Microduck examples (not bundled, not official Pollen): `neil-jo/microduck-walk` (`start`), `neil-jo/microduck-polite-bow` (`pull` + `do`).
 
 ## Kernel rules
 
-- One trick, one graph. Hub is the deliverable. Weights stay off this git.
-- `search` is not a store and not a ranking.
-- A body card reports numbers. It does not invent a fallen verdict.
-- Preview is a checkpoint clip. Cards use `resolve/main`.
-- Real-robot commands print by default.
-- Datacollect JSONL does not enter official PPO.
+See the body-runtime contract. Short form: one trick one graph; Hub delivery; search is not a store; cards report numbers; robot commands print by default.
 
 Out of v0: Jobs training, real-robot install, Credits, a second body kind, leaderboards.
 

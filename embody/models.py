@@ -7,7 +7,7 @@ from uuid import uuid4
 
 
 SOURCE = "embody"
-BODY_KINDS = frozenset({"microduck"})
+STATE_VERSION = 2
 
 
 def utc_now() -> str:
@@ -27,9 +27,9 @@ def hub_resolve(repo: str, filename: str) -> str:
 
 
 @dataclass
-class Claim:
+class AgentBind:
     agent_id: str
-    claimed_at: str
+    bound_at: str
     verified: bool
     acn_base_url: str | None = None
 
@@ -37,34 +37,12 @@ class Claim:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> Claim:
+    def from_dict(cls, data: dict[str, Any]) -> AgentBind:
         return cls(
             agent_id=str(data["agent_id"]),
-            claimed_at=str(data["claimed_at"]),
+            bound_at=str(data.get("bound_at") or data.get("claimed_at") or utc_now()),
             verified=bool(data.get("verified", False)),
             acn_base_url=data.get("acn_base_url"),
-        )
-
-
-@dataclass
-class Body:
-    id: str
-    kind: str
-    asset_ref: str
-    adapter: str
-    registered_at: str
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> Body:
-        return cls(
-            id=str(data["id"]),
-            kind=str(data["kind"]),
-            asset_ref=str(data["asset_ref"]),
-            adapter=str(data["adapter"]),
-            registered_at=str(data["registered_at"]),
         )
 
 
@@ -115,32 +93,39 @@ class Session:
 
 
 @dataclass
-class State:
-    version: int = 1
-    claim: Claim | None = None
-    body: Body | None = None
+class Body:
+    id: str
+    kind: str
+    asset_ref: str
+    adapter: str
+    registered_at: str
+    name: str | None = None
     policies: list[Policy] = field(default_factory=list)
     session: Session | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "version": self.version,
-            "claim": None if self.claim is None else self.claim.to_dict(),
-            "body": None if self.body is None else self.body.to_dict(),
+            "id": self.id,
+            "name": self.name,
+            "kind": self.kind,
+            "asset_ref": self.asset_ref,
+            "adapter": self.adapter,
+            "registered_at": self.registered_at,
             "policies": [p.to_dict() for p in self.policies],
             "session": None if self.session is None else self.session.to_dict(),
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> State:
+    def from_dict(cls, data: dict[str, Any]) -> Body:
         policies = [Policy.from_dict(p) for p in data.get("policies") or []]
-        claim = data.get("claim")
-        body = data.get("body")
         session = data.get("session")
         return cls(
-            version=int(data.get("version") or 1),
-            claim=None if claim is None else Claim.from_dict(claim),
-            body=None if body is None else Body.from_dict(body),
+            id=str(data["id"]),
+            kind=str(data["kind"]),
+            asset_ref=str(data["asset_ref"]),
+            adapter=str(data["adapter"]),
+            registered_at=str(data["registered_at"]),
+            name=data.get("name"),
             policies=policies,
             session=None if session is None else Session.from_dict(session),
         )
@@ -150,3 +135,64 @@ class State:
             if policy.alias == alias:
                 return policy
         return None
+
+    def matches(self, token: str) -> bool:
+        return token in {self.id, self.name, self.asset_ref}
+
+
+@dataclass
+class State:
+    version: int = STATE_VERSION
+    agent: AgentBind | None = None
+    bodies: list[Body] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "version": self.version,
+            "agent": None if self.agent is None else self.agent.to_dict(),
+            "bodies": [b.to_dict() for b in self.bodies],
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> State:
+        if data.get("bodies") is None and (data.get("claim") or data.get("body") or data.get("agent")):
+            return cls._from_v1(data)
+        agent = data.get("agent")
+        return cls(
+            version=int(data.get("version") or STATE_VERSION),
+            agent=None if agent is None else AgentBind.from_dict(agent),
+            bodies=[Body.from_dict(b) for b in data.get("bodies") or []],
+        )
+
+    @classmethod
+    def _from_v1(cls, data: dict[str, Any]) -> State:
+        raw_agent = data.get("agent") or data.get("claim")
+        body = data.get("body")
+        bodies: list[Body] = []
+        if body is not None:
+            migrated = Body.from_dict(body)
+            migrated.policies = [Policy.from_dict(p) for p in data.get("policies") or []]
+            session = data.get("session")
+            migrated.session = None if session is None else Session.from_dict(session)
+            bodies.append(migrated)
+        return cls(
+            version=STATE_VERSION,
+            agent=None if raw_agent is None else AgentBind.from_dict(raw_agent),
+            bodies=bodies,
+        )
+
+    def body_by_token(self, token: str) -> Body | None:
+        hits = [b for b in self.bodies if b.matches(token)]
+        if len(hits) == 1:
+            return hits[0]
+        return None
+
+    def running_by_kind(self, kind: str, except_id: str | None = None) -> list[Body]:
+        out: list[Body] = []
+        for body in self.bodies:
+            if body.kind != kind or body.session is None:
+                continue
+            if except_id is not None and body.id == except_id:
+                continue
+            out.append(body)
+        return out

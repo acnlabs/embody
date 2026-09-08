@@ -6,6 +6,7 @@ from pathlib import Path
 
 
 ADAPTER_ID = "microduck-skill"
+KIND = "microduck"
 
 
 class AdapterError(RuntimeError):
@@ -61,3 +62,47 @@ def run_control(*args: str, dry_run: bool = False) -> dict[str, object]:
         "stdout": proc.stdout,
         "stderr": proc.stderr,
     }
+
+
+class MicroduckRuntime:
+    """First kind pack. Maps body-runtime verbs to microduck-skill control.sh."""
+
+    kind = KIND
+    adapter_id = ADAPTER_ID
+
+    def guard_start(self, state, body) -> None:
+        busy = state.running_by_kind(self.kind, except_id=body.id)
+        if not busy:
+            return
+        other = busy[0]
+        raise AdapterError(
+            f"microduck-skill already has a session on {other.name or other.id}; "
+            "this pack runs one localhost sim at a time. "
+            f"Stop it: python3 -m embody session stop --body {other.name or other.id}"
+        )
+
+    def start(self, policy, *, dry_run: bool) -> dict:
+        return _checked("start", "--repo", policy.hub, "--detach", dry_run=dry_run)
+
+    def pull(self, policy, *, dry_run: bool) -> dict:
+        return _checked("pull", policy.hub, "--as", policy.alias, dry_run=dry_run)
+
+    def do(self, alias: str, *, dry_run: bool) -> dict:
+        return _checked("do", alias, dry_run=dry_run)
+
+    def status(self, *, dry_run: bool) -> dict:
+        return _checked("status", dry_run=dry_run)
+
+    def stop(self, *, dry_run: bool) -> dict:
+        return _checked("stop", dry_run=dry_run)
+
+
+def _checked(*args: str, dry_run: bool) -> dict:
+    try:
+        result = run_control(*args, dry_run=dry_run)
+    except AdapterError:
+        raise
+    if not result.get("ok"):
+        err = str(result.get("stderr") or result.get("stdout") or "microduck-skill failed")
+        raise AdapterError(err.strip() or "microduck-skill failed")
+    return result
