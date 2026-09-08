@@ -110,7 +110,6 @@ def cmd_body_register(args: argparse.Namespace) -> int:
             "agent_id": claim.agent_id,
             "body": state.body.to_dict(),
             "state": str(path),
-            "embot": "spoken name for this attached body",
         }
     )
 
@@ -266,7 +265,6 @@ def cmd_status(_args: argparse.Namespace) -> int:
             "source": "embody",
             "asset_prefix": "embody:",
             "workplace": "studio",
-            "spoken_body": "embot",
             "acn_key_present": bool(api_key()),
             "claim": None if state.claim is None else state.claim.to_dict(),
             "body": None if state.body is None else state.body.to_dict(),
