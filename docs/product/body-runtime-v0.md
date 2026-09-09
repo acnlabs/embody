@@ -1,7 +1,7 @@
 # Body runtime v0
 
 **Status:** Kernel contract  
-**Used by:** studio session (`start` / `pull` / `do` / `status` / `stop`)  
+**Used by:** studio session (`prepare` / `start` / `pull` / `do` / `status` / `stop`)  
 **First implementation:** `kind=microduck` → [microduck-plugin](https://github.com/acnlabs/microduck-plugin)
 
 Embody does not know how a robot walks. It knows how a **body** is used: identity, Hub policy cards, and these verbs. A new machine adds a thin pack that implements this file. It does not copy microduck-skill.
@@ -56,11 +56,14 @@ Studio always uses these names. Missing verb → adapter error, not a kernel fal
 
 | Verb | Meaning | Perpetual | Episodic |
 |---|---|---|---|
-| `start` | Open a session on this body (`venue=sim` today) using a perpetual card | required | refuse |
+| `prepare` | Make `venue=sim` startable on this machine. No-op if already ready. Not train, not cloud sim, not robot pair. | required | required |
+| `start` | Kernel calls `prepare` first. Then open a session (`venue=sim` today) using a perpetual card | required | refuse |
 | `pull` | Load a named card into the running session | optional | required before `do` |
 | `do` | Fire a named episodic card | n/a | required |
 | `status` | Numbers only (`tilt`, feet, joints, …). No fallen verdict | required | required |
 | `stop` | End this body's session | required | required |
+
+`prepare` failed → do not `start`. The kernel never reads pack-specific paths (no `MICRODUCK_RL_ROOT` in embody). A pack may set those only inside its process, including on later verbs (`pull` / `do` / `stop` are new CLI processes). A pack may run a broader doctor; `prepare` succeeds when **sim is startable**, not when train/Jobs env is complete.
 
 Many bodies may have sessions at once. An adapter may refuse a second session **of its own kind**. That is not a global lock.
 
@@ -74,7 +77,7 @@ A pack registers `kind` → adapter id and implements the verbs. v0 table:
 
 | `kind` | Pack | Notes |
 |---|---|---|
-| `microduck` | microduck-skill | `control.sh`; one localhost sim |
+| `microduck` | microduck-skill | `prepare` → `doctor.sh --clone` then adopt default checkout; `stop` → `control.sh shutdown`; other verbs → `control.sh`; one localhost sim |
 | other slugs | none | Body and cards may exist; session errors |
 
 Do not lift into the kernel: observation/action size, PPO, Jobs, `robotctl`, Viser, joint indices.

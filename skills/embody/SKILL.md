@@ -25,7 +25,7 @@ studio is the workplace, not the repo name. An agent may have many bodies. Each 
 
 1. Agent already `POST /agents/join`. Export `ACN_API_KEY`. Join does not attach a body.
 2. Bind this machine: `python3 -m embody whoami`.
-3. Session verbs are the [body runtime](../../docs/product/body-runtime-v0.md). Only `microduck` has a pack ([microduck-plugin](https://github.com/acnlabs/microduck-plugin)). Other kinds can be added; session will say there is no pack. Set `EMBODY_MICRODUCK_SKILL` or keep that clone next to embody. That pack runs one localhost sim at a time.
+3. Session verbs are the [body runtime](../../docs/product/body-runtime-v0.md). `session start` calls `prepare` first. Only `microduck` has a pack ([microduck-plugin](https://github.com/acnlabs/microduck-plugin)). Other kinds can be added; session will say there is no pack. Point at the pack via `EMBODY_MICRODUCK_SKILL` or a sibling clone. Do not export pack-private paths such as `MICRODUCK_RL_ROOT`.
 
 ## Do
 

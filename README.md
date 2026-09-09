@@ -12,7 +12,7 @@ Not a robot. Not an SDK. The place a joined ACN agent gets a body. Microduck is 
 ACN                identity / messages / tasks / wallet
 AgentPlanet        launch / Credits / embed / asset registry
 embody             bind agent, many bodies, studio session
-body runtime       Hub cards + start/pull/do/status/stop
+body runtime       Hub cards + prepare/start/pull/do/status/stop
 microduck-plugin   first kind pack — not the platform
 ```
 
@@ -28,7 +28,7 @@ cd embody
 python3 -m pip install -e .
 ```
 
-Point `EMBODY_MICRODUCK_SKILL` at [microduck-plugin](https://github.com/acnlabs/microduck-plugin) `skills/microduck-skill`, or keep that clone next to this repo.
+Point `EMBODY_MICRODUCK_SKILL` at [microduck-plugin](https://github.com/acnlabs/microduck-plugin) `skills/microduck-skill`, or keep that clone next to this repo. `session start` runs `prepare` first (the pack makes sim startable). Do not set pack-private env such as `MICRODUCK_RL_ROOT`.
 
 ```bash
 export ACN_API_KEY=acn_...          # from POST /agents/join

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -178,6 +179,9 @@ def _mock_skill(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     control = scripts / "control.sh"
     control.write_text("#!/bin/sh\necho mock\n", encoding="utf-8")
     control.chmod(0o755)
+    doctor = scripts / "doctor.sh"
+    doctor.write_text("#!/bin/sh\necho doctor ok\n", encoding="utf-8")
+    doctor.chmod(0o755)
     monkeypatch.setenv("EMBODY_MICRODUCK_SKILL", str(skill))
     return skill
 
@@ -206,6 +210,7 @@ def test_session_per_body_and_adapter_one_sim(
     )
 
     assert main(["session", "start", "--body", "duck-1", "--as", "polite_bow", "--dry-run"]) == 1
+    assert main(["session", "prepare", "--body", "duck-1", "--dry-run"]) == 0
     assert main(["session", "start", "--body", "duck-1", "--dry-run"]) == 0
     assert load().body_by_token("duck-1") is not None
     assert load().body_by_token("duck-1").session is not None
@@ -220,3 +225,33 @@ def test_session_per_body_and_adapter_one_sim(
         skill, "start", "--repo", "neil-jo/microduck-walk", "--detach"
     )
     assert started[-1] == "--detach"
+    prep = adapter_microduck.MicroduckRuntime().prepare(dry_run=True)
+    assert prep["argv"][-1] == "--clone"
+    assert prep["argv"][0].endswith("doctor.sh")
+    stopped = adapter_microduck.MicroduckRuntime().stop(dry_run=True)
+    assert stopped["argv"][-1] == "shutdown"
+
+
+def test_prepare_ok_when_doctor_fails_but_sim_ready(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    skill = _mock_skill(tmp_path, monkeypatch)
+    (skill / "scripts" / "doctor.sh").write_text(
+        "#!/bin/sh\necho jobs missing\nexit 1\n", encoding="utf-8"
+    )
+    monkeypatch.setattr(adapter_microduck, "_adopt_default_rl_root", lambda: None)
+    monkeypatch.setattr(adapter_microduck, "_sim_ready", lambda: True)
+    out = adapter_microduck.MicroduckRuntime().prepare(dry_run=False)
+    assert out["ok"] is True
+    assert out["returncode"] == 1
+
+
+def test_run_control_adopts_default_checkout(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _mock_skill(tmp_path, monkeypatch)
+    checkout = tmp_path / "microduck_rl"
+    (checkout / "src" / "mjlab_microduck").mkdir(parents=True)
+    (checkout / "pyproject.toml").write_text("[project]\nname='x'\n", encoding="utf-8")
+    monkeypatch.delenv("MICRODUCK_RL_ROOT", raising=False)
+    monkeypatch.setattr(adapter_microduck, "_default_rl_root", lambda: checkout)
+    adapter_microduck.run_control("status", dry_run=True)
+    assert os.environ["MICRODUCK_RL_ROOT"] == str(checkout)

@@ -64,10 +64,14 @@ def run(
             "See docs/product/body-runtime-v0.md."
         )
     try:
+        if op == "prepare":
+            return pack.prepare(dry_run=dry_run)
         if op == "start":
             if policy is None:
                 raise BodyRuntimeError("start needs a perpetual policy card")
-            return pack.start(policy, dry_run=dry_run)
+            prepared = pack.prepare(dry_run=dry_run)
+            started = pack.start(policy, dry_run=dry_run)
+            return {**started, "prepare": prepared}
         if op == "pull":
             if policy is None:
                 raise BodyRuntimeError("pull needs a policy card")

@@ -49,6 +49,7 @@ def control_argv(skill: Path, *args: str) -> list[str]:
 
 
 def run_control(*args: str, dry_run: bool = False) -> dict[str, object]:
+    _adopt_default_rl_root()
     skill = resolve_skill()
     argv = control_argv(skill, *args)
     if dry_run:
@@ -81,6 +82,29 @@ class MicroduckRuntime:
             f"Stop it: python3 -m embody session stop --body {other.name or other.id}"
         )
 
+    def prepare(self, *, dry_run: bool) -> dict:
+        skill = resolve_skill()
+        argv = [str(skill / "scripts" / "doctor.sh"), "--clone"]
+        if dry_run:
+            return {"ok": True, "dry_run": True, "argv": argv, "skill": str(skill)}
+        proc = subprocess.run(argv, check=False, text=True, capture_output=True)
+        _adopt_default_rl_root()
+        # doctor.sh --clone also checks Jobs/train env. prepare only needs sim startable.
+        if not _sim_ready():
+            err = (proc.stderr or proc.stdout or "prepare failed").strip()
+            raise AdapterError(err or "prepare failed: no microduck_rl checkout")
+        return {
+            "ok": True,
+            "returncode": proc.returncode,
+            "argv": argv,
+            "skill": str(skill),
+            "stdout": proc.stdout,
+            "stderr": proc.stderr,
+            "note": "sim startable"
+            if proc.returncode == 0
+            else "sim startable (doctor also checks Jobs/train; those are not required)",
+        }
+
     def start(self, policy, *, dry_run: bool) -> dict:
         return _checked("start", "--repo", policy.hub, "--detach", dry_run=dry_run)
 
@@ -94,7 +118,31 @@ class MicroduckRuntime:
         return _checked("status", dry_run=dry_run)
 
     def stop(self, *, dry_run: bool) -> dict:
-        return _checked("stop", dry_run=dry_run)
+        return _checked("shutdown", dry_run=dry_run)
+
+
+def _default_rl_root() -> Path:
+    return Path.home() / ".local" / "src" / "microduck_rl"
+
+
+def _is_rl_checkout(path: Path) -> bool:
+    return (path / "pyproject.toml").is_file() and (path / "src" / "mjlab_microduck").is_dir()
+
+
+def _sim_ready() -> bool:
+    env = os.environ.get("MICRODUCK_RL_ROOT")
+    if env and _is_rl_checkout(Path(env)):
+        return True
+    return _is_rl_checkout(_default_rl_root())
+
+
+def _adopt_default_rl_root() -> None:
+    """Pack-private. Kernel does not set or document this variable."""
+    if os.environ.get("MICRODUCK_RL_ROOT"):
+        return
+    default = _default_rl_root()
+    if _is_rl_checkout(default):
+        os.environ["MICRODUCK_RL_ROOT"] = str(default)
 
 
 def _checked(*args: str, dry_run: bool) -> dict:

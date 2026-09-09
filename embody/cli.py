@@ -220,6 +220,13 @@ def _startable_policy(body: Body, alias: str | None) -> Policy:
     return startable[0]
 
 
+def cmd_session_prepare(args: argparse.Namespace) -> int:
+    state = load()
+    body = _resolve_body(state, args.body)
+    adapter = run_adapter(body, "prepare", dry_run=bool(args.dry_run))
+    return _dump({"ok": True, "body": body.name or body.id, "adapter": adapter})
+
+
 def cmd_session_start(args: argparse.Namespace) -> int:
     state = load()
     body = _resolve_body(state, args.body)
@@ -405,6 +412,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     session = sub.add_parser("session", help="studio session on one body")
     session_sub = session.add_subparsers(dest="session_cmd", required=True)
+    prep = session_sub.add_parser("prepare")
+    prep.add_argument("--dry-run", action="store_true")
+    _add_body_flag(prep)
+    prep.set_defaults(func=cmd_session_prepare)
     start = session_sub.add_parser("start")
     start.add_argument("--as", dest="as_name")
     start.add_argument("--dry-run", action="store_true")

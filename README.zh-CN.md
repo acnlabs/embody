@@ -12,7 +12,7 @@
 ACN                身份 / 消息 / 任务 / 钱包
 AgentPlanet        上新 / Credits / embed / 资产登记
 embody             绑定 agent、多具身体、studio 会话
-body runtime       Hub 卡 + start/pull/do/status/stop
+body runtime       Hub 卡 + prepare/start/pull/do/status/stop
 microduck-plugin   第一种机型包，不是本平台
 ```
 
@@ -28,7 +28,7 @@ cd embody
 python3 -m pip install -e .
 ```
 
-把 `EMBODY_MICRODUCK_SKILL` 指到 [microduck-plugin](https://github.com/acnlabs/microduck-plugin) 的 `skills/microduck-skill`，或把该仓放在 embody 旁边。
+把 `EMBODY_MICRODUCK_SKILL` 指到 [microduck-plugin](https://github.com/acnlabs/microduck-plugin) 的 `skills/microduck-skill`，或把该仓放在 embody 旁边。`session start` 会先 `prepare`（由 pack 把仿真准备好）。不要手设 pack 内部变量（例如 `MICRODUCK_RL_ROOT`）。
 
 ```bash
 export ACN_API_KEY=acn_...          # 来自 POST /agents/join

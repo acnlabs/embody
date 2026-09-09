@@ -70,18 +70,18 @@ Local state: `$EMBODY_HOME` (default `~/.embody/state.json`). That file is not t
 |---|---|
 | Train | Adapter only. No trainer in this kernel. |
 | Manage | `whoami`, `body add` / `list`, policy attach / list. |
-| Control | Session start / pull / do / status / stop per body. |
+| Control | Session prepare / start / pull / do / status / stop per body. |
 | Show | Card fields + Hub preview URL. Body card reports numbers only. |
 
 Datacollect and real-robot lines stay in the adapter. Real-robot commands print by default. JSONL does not enter official PPO.
 
 ## Body runtime
 
-Contract: [body-runtime-v0.md](./body-runtime-v0.md). Kernel dispatches `start` / `pull` / `do` / `status` / `stop` by `kind`. It does not call `control.sh`.
+Contract: [body-runtime-v0.md](./body-runtime-v0.md). Kernel dispatches `prepare` / `start` / `pull` / `do` / `status` / `stop` by `kind`. `start` always `prepare`s first. It does not call `control.sh` or pack env vars.
 
 | `kind` | Pack | Session |
 |---|---|---|
-| `microduck` | [microduck-skill](https://github.com/acnlabs/microduck-plugin) | pack maps verbs → `control.sh` |
+| `microduck` | [microduck-skill](https://github.com/acnlabs/microduck-plugin) | `prepare` → `doctor.sh --clone`; session → `control.sh` |
 | anything else | none | body + cards ok; session errors |
 
 Microduck examples (not bundled, not official Pollen): `neil-jo/microduck-walk` (`start`), `neil-jo/microduck-polite-bow` (`pull` + `do`).
