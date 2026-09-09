@@ -2,16 +2,16 @@
 
 Not a robot. Not an SDK. The place a joined ACN agent gets a body. Microduck is the first body.
 
-**https://github.com/acnlabs/embody** — product, repo, AgentPlanet `source`, and asset prefix are all `embody`.
+**https://github.com/acnlabs/embody** — product and repo are `embody`. ACN is identity only. This machine drives the body.
 
 [中文说明](README.zh-CN.md) · [v0 spec](docs/product/embody-v0.md) · [body runtime](docs/product/body-runtime-v0.md) · [agent skill](skills/embody/)
 
 ## Scope
 
 ```text
-ACN                identity / messages / tasks / wallet
-AgentPlanet        launch / Credits / embed / asset registry
-embody             bind agent, many bodies, studio session
+ACN                identity / messages / tasks / wallet — not a body remote
+AgentPlanet        launch / Credits / embed / Store — not the body ledger
+embody             this machine: bind agent, many bodies, studio session
 body runtime       Hub cards + prepare/start/pull/do/status/stop
 microduck-plugin   first kind pack — not the platform
 ```

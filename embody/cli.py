@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 from typing import Any
 
@@ -351,19 +350,12 @@ def registry_payload(state: State) -> dict[str, Any]:
         "store_listable": False,
         "posted": False,
         "assets": assets,
-        "note": "v0 prints the payload. POST only if EMBODY_REGISTER_ASSETS=1.",
+        "note": "local workplace ledger only. Does not POST to ACN or AgentPlanet.",
     }
 
 
 def cmd_registry_print(_args: argparse.Namespace) -> int:
-    payload = registry_payload(load())
-    if os.environ.get("EMBODY_REGISTER_ASSETS") == "1":
-        payload["posted"] = False
-        payload["note"] = (
-            "EMBODY_REGISTER_ASSETS=1 is reserved; v0 still does not POST. "
-            "Use AgentPlanet POST /api/assets/registry with source=embody."
-        )
-    return _dump({"ok": True, **payload})
+    return _dump({"ok": True, **registry_payload(load())})
 
 
 def _add_body_flag(parser: argparse.ArgumentParser) -> None:
@@ -443,7 +435,7 @@ def build_parser() -> argparse.ArgumentParser:
     st = sub.add_parser("status", help="local agent and bodies")
     st.set_defaults(func=cmd_status)
 
-    registry = sub.add_parser("registry", help="AgentPlanet payload (source=embody)")
+    registry = sub.add_parser("registry", help="print this machine's body ledger")
     registry_sub = registry.add_subparsers(dest="registry_cmd", required=True)
     printed = registry_sub.add_parser("print")
     printed.set_defaults(func=cmd_registry_print)

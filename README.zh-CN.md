@@ -2,16 +2,16 @@
 
 不是一只机器人，也不是 SDK。是已加入 ACN 的 agent 获得身体的地方。Microduck 是第一种身体。
 
-**https://github.com/acnlabs/embody** — 产品、仓库、AgentPlanet `source`、资产前缀都叫 `embody`。
+**https://github.com/acnlabs/embody** — 产品、仓库叫 `embody`。ACN 只认人。身体在这台机器上开。
 
 [English README](README.md) · [v0 规格](docs/product/embody-v0.md) · [身体运行时](docs/product/body-runtime-v0.md) · [agent skill](skills/embody/)
 
 ## 范围
 
 ```text
-ACN                身份 / 消息 / 任务 / 钱包
-AgentPlanet        上新 / Credits / embed / 资产登记
-embody             绑定 agent、多具身体、studio 会话
+ACN                身份 / 消息 / 任务 / 钱包 — 不是身体遥控器
+AgentPlanet        上新 / Credits / embed / Store — 不是身体账本
+embody             这台机器：绑定 agent、多具身体、studio 会话
 body runtime       Hub 卡 + prepare/start/pull/do/status/stop
 microduck-plugin   第一种机型包，不是本平台
 ```

@@ -1,7 +1,7 @@
 # Embody v0
 
 **Status:** Skeleton  
-**Repo / product / `source` / asset prefix:** `embody` (`acnlabs/embody`)  
+**Repo / product:** `embody` (`acnlabs/embody`)  
 **Workplace:** studio
 
 > Not a robot. Not an SDK. The place a joined ACN agent gets a body. Microduck is the first body.
@@ -11,39 +11,37 @@
 | Slot | Value |
 |---|---|
 | GitHub / product | `acnlabs/embody` |
-| AgentPlanet `source` | `embody` |
-| `asset_ref` prefix | `embody:` |
+| Local `asset_ref` prefix | `embody:` (this machine's ledger only) |
 | Workplace | studio (train / manage / control / show) |
 
 Do not name the repo embody-studio or embot. `embot` is spoken language for an attached body, not a second product.
-
-v0 does not change the ACN protocol. Embody only consumes an `agent_id` from `POST /agents/join`.
 
 ## Layers
 
 ```text
 ACN                identity / messages / tasks / wallet
-AgentPlanet        launch / Credits / embed / asset registry
-embody             bind agent, many bodies, studio, registry payload
+                   whoami reads agent_id. Not a body remote.
+AgentPlanet        launch / Credits / embed / Store
+                   not the body ledger, not the control plane
+embody             this machine: bind agent, bodies, studio session
 body runtime       session verbs + Hub cards — docs/product/body-runtime-v0.md
 microduck-plugin   first kind pack — not the platform
 ```
 
 ```text
-ACN agent
+ACN agent (identity)
   → whoami (bind this machine)
-  → body add (many kinds)
-  → studio session (runtime verbs)
-  → kind pack (microduck-skill today)
-       → Hub policy
-       → localhost sim
-  → AgentPlanet registry (source=embody)
+  → body add / policy attach   (local)
+  → studio session             (local → kind pack → sim or later robot)
 ```
 
 - Not part of the AgentPlanet monorepo.
 - Not merged with [microduck-plugin](https://github.com/acnlabs/microduck-plugin).
 - Not official Pollen firmware.
-- Do not debit Credits with `source=embody`.
+- Do not drive or manage a body through ACN or AgentPlanet.
+- Do not debit Credits to own or move a body.
+
+v0 does not change the ACN protocol. Join may later carry an optional public card; that is a nameplate, not a remote. Embody only consumes `agent_id` from `POST /agents/join` / `GET /agents/me`.
 
 ## Cardinality
 
@@ -60,9 +58,9 @@ Join does not attach a body. `whoami` only binds this machine to an `agent_id`. 
 | Body | `embody:body:{id}` | `body` | A machine-type slot (`kind` slug). Sim and robot share this body; they are session venues. |
 | Policy | `embody:policy:{id}` | `policy` | Pointer at a Hub graph (`policy.onnx`). One trick, one graph. |
 
-Registerable on AgentPlanet. Not Store-listable in v0. Policy preview: `https://huggingface.co/{repo}/resolve/main/preview.mp4`. A raw `/resolve/main/` click downloads; play the clip on the model card.
+These rows live in `$EMBODY_HOME` (default `~/.embody/state.json`). That file is the workplace ledger on this machine. It is not an ACN profile and not an AgentPlanet registry.
 
-Local state: `$EMBODY_HOME` (default `~/.embody/state.json`). That file is not the platform registry.
+Policy preview: `https://huggingface.co/{repo}/resolve/main/preview.mp4`. A raw `/resolve/main/` click downloads; play the clip on the model card.
 
 ## Studio (v0)
 
@@ -92,17 +90,12 @@ See the body-runtime contract. Short form: one trick one graph; Hub delivery; se
 
 Out of v0: Jobs training, real-robot install, Credits, a second body kind, leaderboards.
 
-## AgentPlanet reservation
+## What is not a control plane
 
-| Field | Value |
-|---|---|
-| `source` | `embody` |
-| `asset_ref` | must start with `embody:` |
-| Registerable kinds | `body`, `policy` |
-| Store listable | no (v0) |
-| Embed host | later, via `embed_hosts` |
-| Charge `source` | do not reuse `embody` |
+| Layer | May do | Must not do |
+|---|---|---|
+| ACN | Identity. Optional later: a public nameplate that this agent has bodies. | Session verbs. Joint commands. Own the workplace ledger. |
+| AgentPlanet | Launch / Credits / embed / Store. | Body title. Body remote. Charge `source=embody`. |
+| embody | Bind this machine, add bodies, attach cards, drive the session. | Call ACN or AgentPlanet to start / do / stop. |
 
-`embody registry print` shows the payload. v0 does not POST unless that flow is enabled later.
-
-See AgentPlanet `docs/product/embody-source-v0.md`.
+`registry print` dumps the **local** ledger. It does not POST.

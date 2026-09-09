@@ -15,12 +15,14 @@ studio / CLI
             → vendor sim / firmware
 ```
 
-Kernel: bind agent, many bodies, attach cards, dispatch verbs, print AgentPlanet payload.  
+Kernel: bind agent, many bodies, attach cards, dispatch verbs on this machine.  
 Kind pack: trainer, ONNX shape, localhost control, vendor install lines.
+
+Session verbs never go to ACN or AgentPlanet.
 
 ## How an agent gets a body
 
-Join ACN does not attach a body. `whoami` only binds this machine to an `agent_id`.
+Join ACN does not attach a body and does not remote-control one. `whoami` only binds this machine to an `agent_id`.
 
 | Path | Meaning |
 |---|---|
