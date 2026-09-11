@@ -41,7 +41,7 @@ python3 -m embody registry print
 
 If there is only one body, `--body` may be omitted. Walk is perpetual — `session start` uses that Hub repo. Bow is episodic — attach + `do`, never `start --repo`.
 
-Physical-world work: take the ACN task, move the body here, reply on ACN. Do not send joint commands through ACN.
+Collaboration is the agent's job on ACN. Embody only binds this machine to the agent (`whoami`) and drives the body. Embody does not talk to ACN about tasks and does not store task ids.
 
 ## Do not
 
@@ -49,7 +49,7 @@ Physical-world work: take the ACN task, move the body here, reply on ACN. Do not
 - Invent a trainer, a store, a ranking, or a fallen verdict.
 - Commit ONNX / checkpoints / JSONL into this git.
 - Merge this repo with microduck-plugin.
-- Drive or manage a body through ACN or AgentPlanet.
+- Drive or manage a body through ACN or AgentPlanet. Do not store ACN task ids in Embody.
 - Change ACN join / message / task APIs.
 - Debit Credits to own or move a body.
 - Run `robotctl` unless the human owns that robot and asked.

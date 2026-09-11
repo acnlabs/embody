@@ -2,7 +2,7 @@
 
 Not a robot. Not an SDK. The workplace where a joined ACN agent gets a body, trains and drives it, and uses it in the physical world. Microduck is the first kind runtime — the v0 probe, not the product.
 
-**https://github.com/acnlabs/embody** — ACN is identity and tasks. This machine drives the body.
+**https://github.com/acnlabs/embody** — The agent is the stitch: ACN for identity and collaboration, this machine for the body. Embody talks to ACN only for `whoami`.
 
 [中文说明](README.zh-CN.md) · [v0 spec](docs/product/embody-v0.md) · [body runtime](docs/product/body-runtime-v0.md) · [agent skill](skills/embody/)
 

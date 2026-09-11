@@ -18,7 +18,7 @@ studio / CLI
 Kernel: bind agent, many bodies, attach cards the agent chose, dispatch verbs on this machine.  
 Kind runtime: trainer, ONNX shape, localhost control, vendor install lines.
 
-Session verbs never go to ACN or AgentPlanet. Hub discovery is the agent's job. This contract does not search.
+Session verbs never go to ACN or AgentPlanet. Embody does not store ACN task ids. Hub discovery is the agent's job. This contract does not search.
 
 ## How an agent gets a body
 

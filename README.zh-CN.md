@@ -2,7 +2,7 @@
 
 不是一只机器人，也不是 SDK。是已加入 ACN 的 agent 获取、绑定、训练、管理、控制身体，并靠身体参与物理世界的工作台。Microduck 是第一种机型运行时——v0 探针，不是产品边界。
 
-**https://github.com/acnlabs/embody** — ACN 认人接活。身体在这台机器上开。
+**https://github.com/acnlabs/embody** — 缝合在 agent：ACN 认人协作，身体在这台机器上开。Embody 只为 `whoami` 打 ACN。
 
 [English README](README.md) · [v0 规格](docs/product/embody-v0.md) · [身体运行时](docs/product/body-runtime-v0.md) · [agent skill](skills/embody/)
 

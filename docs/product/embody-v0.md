@@ -6,7 +6,7 @@
 
 > Not a robot. Not an SDK. The workplace where a joined ACN agent acquires, binds, trains, manages, and controls bodies — sim and real — and uses them in physical-world tasks.
 
-**North star:** any machine type, sim and robot, train and drive, then act on ACN tasks.  
+**North star:** any machine type, sim and robot, train and drive. The **agent** then uses that body while collaborating on ACN.  
 **v0 probe:** one kind (`microduck`), localhost sim, attach + session. Not the product boundary.
 
 ## Naming
@@ -21,15 +21,14 @@ Do not name the repo embody-studio or embot. `embot` is spoken language for an a
 
 ## Effect
 
-An agent uses Embody to **get, bind, train, manage, and control** bodies of various kinds (simulation and real machines), and through those bodies take part in physical-world work and collaboration.
+An agent uses Embody to **get, bind, train, manage, and control** bodies of various kinds (simulation and real machines). The same agent collaborates on ACN. Embodiment binds to the agent. Embody talks to ACN only to bind identity (`whoami` / `/agents/me`). They do not talk about tasks or control.
 
 ```text
-ACN task / message     →  agent decides
-Embody on this machine →  that body moves (sim or robot)
-status numbers         →  agent replies on ACN
+ACN  ←→  agent  ←→  body on this machine (Embody)
+     tasks, collab      bind + drive
 ```
 
-Embody does not forward ACN. ACN does not remote the body. The body is the actuator.
+The agent is the only stitch between collaboration and the body. Embody does not store task ids, fetch work, or write back to ACN. ACN does not send joint commands.
 
 ## Layers
 
@@ -109,15 +108,15 @@ Microduck examples (not bundled, not official Pollen): `neil-jo/microduck-walk` 
 
 One trick, one graph. Hub delivery. Agent finds the card. Cards report numbers. Robot commands print by default. A second kind is a new runtime, not a kernel feature.
 
-Out of this probe: Jobs training CLI, real-robot pair, Credits, a second body kind, leaderboards, Hub search in Embody.
+Out of this probe: Jobs training CLI, real-robot pair, Credits, a second body kind, leaderboards, Hub search in Embody, any Embody↔ACN task pipe.
 
 ## What is not a control plane
 
 | Layer | May do | Must not do |
 |---|---|---|
-| ACN | Identity, tasks, collaboration. Optional later: a public nameplate. | Session verbs. Joint commands. Own the workplace ledger. |
+| ACN | Identity, tasks, collaboration with the **agent**. Optional later: a public nameplate. | Session verbs. Joint commands. Own the workplace ledger. Talk to the body. |
 | AgentPlanet | Launch / Credits / embed / Store. | Body title. Body remote. Charge `source=embody`. |
-| embody | Acquire / bind / train (dispatch) / manage / control on this machine. | Call ACN or AgentPlanet to start / do / stop. Search Hub. |
+| embody | Bind this machine to the agent. Acquire / train (dispatch) / manage / control the body. | Call ACN about tasks. Store task ids. Search Hub. |
 | kind runtime | Train and move this machine type. | Become the platform. Rank Hub cards for the workplace. |
 
 `registry print` dumps the **local** ledger. It does not POST.
