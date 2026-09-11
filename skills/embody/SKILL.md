@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires a joined ACN agent (ACN_API_KEY from POST /agents/join). First body kind needs microduck-plugin / microduck-skill. Optional: EMBODY_HOME, EMBODY_MICRODUCK_SKILL, ACN_BASE_URL."
 metadata:
   author: acnlabs
-  version: "0.1.5"
+  version: "0.1.6"
   homepage: "https://github.com/acnlabs/embody"
   repository: "https://github.com/acnlabs/embody"
   product: embody
@@ -21,7 +21,7 @@ Do not start with `whoami`. `whoami` is this body asking ACN who it is bound to,
 
 ## 1. Create a body (say where it came from)
 
-Agent already `POST /agents/join`. Export `ACN_API_KEY`. Join does not create a body.
+Agent already `POST /agents/join`. Export `ACN_API_KEY` (and `ACN_BASE_URL` if not the default). Join does not create a body. This machine may already have them in `~/.acn/config.json` (`api_key`, `base_url`) — read that file yourself; Embody does not load it.
 
 v0 create is localhost sim. `--origin robot` (acquire a real unit) is out of this probe.
 
