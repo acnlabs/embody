@@ -208,6 +208,7 @@ def _mock_skill(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     control.write_text(
         "#!/bin/sh\n"
         'if [ "$1" = "status" ]; then echo \'{"tilt_deg": 1.5, "ok": true}\'; exit 0; fi\n'
+        'if [ "$1" = "do" ]; then echo \'{"tilt_deg": 2.0, "ok": true, "executed": true}\'; exit 0; fi\n'
         "echo mock\n",
         encoding="utf-8",
     )
@@ -259,7 +260,11 @@ def test_session_per_body_and_adapter_one_sim(
     assert shown["show"][0]["numbers"] == {"tilt_deg": 1.5, "ok": True}
     assert main(["session", "start", "--body", "duck-2", "--dry-run"]) == 1
     assert main(["session", "pull", "--body", "duck-1", "--as", "polite_bow", "--dry-run"]) == 0
-    assert main(["session", "do", "--body", "duck-1", "polite_bow", "--dry-run"]) == 0
+    capsys.readouterr()
+    assert main(["session", "do", "--body", "duck-1", "polite_bow"]) == 0
+    did = json.loads(capsys.readouterr().out)
+    assert did["show"]["numbers"] == {"tilt_deg": 2.0, "ok": True, "executed": True}
+    assert did["show"]["cards"]
     assert main(["session", "stop", "--body", "duck-1", "--dry-run"]) == 0
     assert load().body_by_token("duck-1").session is None
     assert main(["session", "start", "--body", "duck-2", "--dry-run"]) == 0
@@ -272,6 +277,26 @@ def test_session_per_body_and_adapter_one_sim(
     assert prep["argv"][0].endswith("doctor.sh")
     stopped = adapter_microduck.MicroduckRuntime().stop(dry_run=True)
     assert stopped["argv"][-1] == "shutdown"
+
+
+def test_show_keeps_cards_when_runtime_status_fails(
+    home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    skill = _mock_skill(tmp_path, monkeypatch)
+    (skill / "scripts" / "control.sh").write_text(
+        "#!/bin/sh\necho sim down >&2\nexit 1\n", encoding="utf-8"
+    )
+    run(["whoami", "--offline", "--agent-id", "agent-1"])
+    run(["body", "add", "--kind", "microduck", "--name", "duck-1"])
+    run(["policy", "attach", "--hub", "neil-jo/microduck-walk", "--as", "walk"])
+    run(["session", "start", "--dry-run"])
+    capsys.readouterr()
+    assert main(["show"]) == 0
+    shown = json.loads(capsys.readouterr().out)
+    card = shown["show"][0]
+    assert card["cards"][0]["alias"] == "walk"
+    assert card["numbers"] is None
+    assert "sim down" in card["numbers_error"]
 
 
 def test_prepare_ok_when_doctor_fails_but_sim_ready(

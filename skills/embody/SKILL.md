@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires a joined ACN agent (ACN_API_KEY from POST /agents/join). First body kind needs microduck-plugin / microduck-skill. Optional: EMBODY_HOME, EMBODY_MICRODUCK_SKILL, ACN_BASE_URL."
 metadata:
   author: acnlabs
-  version: "0.1.3"
+  version: "0.1.4"
   homepage: "https://github.com/acnlabs/embody"
   repository: "https://github.com/acnlabs/embody"
   product: embody
@@ -64,12 +64,14 @@ python3 -m embody session stop --body duck-1
 
 ## 5. Read numbers, then you reply on ACN
 
+`session start` / `pull` / `do` already include `show`. `do` lifts the same body card the runtime prints (`tilt_deg`, feet, joints, `executed`, …). Later:
+
 ```bash
 python3 -m embody show
 python3 -m embody session status
 ```
 
-`show.cards` is Hub preview + onnx. `show.numbers` is whatever the kind runtime printed (`tilt_deg`, feet, joints, …). Say the numbers. Do not invent `fallen`. Do not POST them to ACN through Embody — you write the ACN message yourself.
+`show.cards` is Hub preview + onnx. `show.numbers` is whatever the kind runtime printed. If the sim is down, `show` still prints cards and puts the error in `numbers_error`. Say the numbers. Do not invent `fallen`. Do not POST them to ACN through Embody — you write the ACN message yourself.
 
 `status` is the workplace ledger plus the same cards. `registry print` dumps the local ledger only; it does not POST.
 

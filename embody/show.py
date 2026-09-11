@@ -31,6 +31,22 @@ def next_hint(body: Body) -> str:
     return "session status for numbers; session do ALIAS for episodic; session stop when done"
 
 
+def show_for(
+    body: Body,
+    *,
+    adapter: dict[str, Any] | None = None,
+    numbers_error: str | None = None,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        **body_card(body),
+        "numbers": lift_runtime_numbers(adapter) if adapter else None,
+        "note": "numbers only; do not invent a fallen verdict",
+    }
+    if numbers_error:
+        payload["numbers_error"] = numbers_error
+    return payload
+
+
 def body_card(body: Body) -> dict[str, Any]:
     return {
         "id": body.id,

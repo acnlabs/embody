@@ -18,7 +18,7 @@ from embody.models import (
     new_id,
     utc_now,
 )
-from embody.show import body_card, lift_runtime_numbers
+from embody.show import body_card, show_for
 from embody.store import load, save
 
 
@@ -246,6 +246,7 @@ def cmd_session_start(args: argparse.Namespace) -> int:
             "body": body.name or body.id,
             "session": body.session.to_dict(),
             "policy": policy.to_dict(),
+            "show": show_for(body, adapter=adapter),
             "adapter": adapter,
             "state": str(path),
         }
@@ -259,7 +260,15 @@ def cmd_session_pull(args: argparse.Namespace) -> int:
     if policy is None:
         raise CliError(f"unknown policy alias {args.as_name!r} — attach first")
     adapter = run_adapter(body, "pull", policy=policy, dry_run=bool(args.dry_run))
-    return _dump({"ok": True, "body": body.name or body.id, "policy": policy.to_dict(), "adapter": adapter})
+    return _dump(
+        {
+            "ok": True,
+            "body": body.name or body.id,
+            "policy": policy.to_dict(),
+            "show": show_for(body, adapter=adapter),
+            "adapter": adapter,
+        }
+    )
 
 
 def cmd_session_do(args: argparse.Namespace) -> int:
@@ -274,24 +283,22 @@ def cmd_session_do(args: argparse.Namespace) -> int:
     if policy is None:
         raise CliError(f"unknown policy alias {args.alias!r}")
     adapter = run_adapter(body, "do", alias=policy.alias, dry_run=bool(args.dry_run))
-    return _dump({"ok": True, "body": body.name or body.id, "policy": policy.to_dict(), "adapter": adapter})
+    return _dump(
+        {
+            "ok": True,
+            "body": body.name or body.id,
+            "policy": policy.to_dict(),
+            "show": show_for(body, adapter=adapter),
+            "adapter": adapter,
+        }
+    )
 
 
 def cmd_session_status(args: argparse.Namespace) -> int:
     state = load()
     body = _resolve_body(state, args.body)
     adapter = run_adapter(body, "status", dry_run=bool(args.dry_run))
-    return _dump(
-        {
-            "ok": True,
-            "show": {
-                **body_card(body),
-                "numbers": lift_runtime_numbers(adapter),
-                "note": "numbers only; do not invent a fallen verdict",
-            },
-            "adapter": adapter,
-        }
-    )
+    return _dump({"ok": True, "show": show_for(body, adapter=adapter), "adapter": adapter})
 
 
 def cmd_session_stop(args: argparse.Namespace) -> int:
@@ -326,20 +333,16 @@ def cmd_show(args: argparse.Namespace) -> int:
     _require_agent(state)
     if args.body or len(state.bodies) == 1:
         body = _resolve_body(state, args.body)
-        numbers = None
         adapter = None
+        numbers_error = None
         if body.session is not None:
-            adapter = run_adapter(body, "status", dry_run=bool(args.dry_run))
-            numbers = lift_runtime_numbers(adapter)
+            try:
+                adapter = run_adapter(body, "status", dry_run=bool(args.dry_run))
+            except AdapterError as exc:
+                numbers_error = str(exc)
         payload: dict[str, Any] = {
             "ok": True,
-            "show": [
-                {
-                    **body_card(body),
-                    "numbers": numbers,
-                    "note": "numbers only; do not invent a fallen verdict",
-                }
-            ],
+            "show": [show_for(body, adapter=adapter, numbers_error=numbers_error)],
             "note": "cards + numbers. Reply on ACN yourself. Embody does not store task ids.",
         }
         if adapter is not None:
