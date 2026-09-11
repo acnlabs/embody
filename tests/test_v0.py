@@ -26,6 +26,20 @@ def run(argv: list[str]) -> dict:
     return load().to_dict()
 
 
+def add_sim(name: str | None = None) -> None:
+    argv = ["body", "add", "--kind", "microduck", "--origin", "sim"]
+    if name:
+        argv += ["--name", name]
+    run(argv)
+
+
+def bind_offline(agent_id: str = "agent-1", body: str | None = None) -> None:
+    argv = ["bind", "--offline", "--agent-id", agent_id]
+    if body:
+        argv += ["--body", body]
+    run(argv)
+
+
 def test_lift_runtime_numbers() -> None:
     raw = {"tilt_deg": 4.2, "ok": True, "feet": {"left": {"contact": True}}}
     assert lift_runtime_numbers({"stdout": json.dumps(raw)}) == raw
@@ -50,8 +64,14 @@ def test_asset_prefix_locked() -> None:
 
 def test_whoami_body_policy_registry(home: Path, capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["claim"]) == 1
+    assert main(["whoami", "--offline", "--agent-id", "agent-1"]) == 1
+    add_sim("duck-1")
+    assert main(["whoami", "--offline", "--agent-id", "agent-1"]) == 1
+    assert main(["bind", "--offline", "--agent-id", "agent-1"]) == 0
     assert main(["whoami", "--offline", "--agent-id", "agent-1"]) == 0
-    assert main(["body", "add", "--kind", "microduck", "--name", "duck-1"]) == 0
+    body = load().bodies[0]
+    assert body.origin == "sim"
+    assert body.bound_agent_id == "agent-1"
     assert main(["policy", "attach", "--hub", "neil-jo/microduck-walk", "--as", "walk"]) == 0
     assert main(
         [
@@ -71,6 +91,7 @@ def test_whoami_body_policy_registry(home: Path, capsys: pytest.CaptureFixture[s
     body = state.bodies[0]
     assert body.name == "duck-1"
     assert body.kind == "microduck"
+    assert body.origin == "sim"
     assert body.asset_ref.startswith("embody:body:")
     walk = body.policy_by_alias("walk")
     bow = body.policy_by_alias("polite_bow")
@@ -108,9 +129,10 @@ def test_whoami_body_policy_registry(home: Path, capsys: pytest.CaptureFixture[s
 
 
 def test_many_bodies_need_flag(home: Path) -> None:
-    run(["whoami", "--offline", "--agent-id", "agent-1"])
-    run(["body", "add", "--kind", "microduck", "--name", "duck-1"])
-    run(["body", "add", "--kind", "microduck", "--name", "duck-2"])
+    add_sim("duck-1")
+    add_sim("duck-2")
+    bind_offline(body="duck-1")
+    bind_offline(body="duck-2")
     assert main(["policy", "attach", "--hub", "neil-jo/microduck-walk", "--as", "walk"]) == 1
     assert (
         main(
@@ -133,24 +155,34 @@ def test_many_bodies_need_flag(home: Path) -> None:
 
 
 def test_switch_agent_needs_replace(home: Path) -> None:
-    run(["whoami", "--offline", "--agent-id", "agent-1"])
-    run(["body", "add", "--kind", "microduck"])
-    assert main(["whoami", "--offline", "--agent-id", "agent-2"]) == 1
-    assert main(["whoami", "--offline", "--agent-id", "agent-2", "--replace"]) == 0
+    add_sim("duck-1")
+    bind_offline("agent-1")
+    assert main(["bind", "--offline", "--agent-id", "agent-2"]) == 1
+    assert main(["bind", "--offline", "--agent-id", "agent-2", "--replace"]) == 0
     state = load()
     assert state.agent is not None
     assert state.agent.agent_id == "agent-2"
-    assert state.bodies == []
+    assert len(state.bodies) == 1
+    assert state.bodies[0].bound_agent_id == "agent-2"
+
+
+def test_origin_robot_refused(home: Path) -> None:
+    assert main(["body", "add", "--kind", "microduck", "--origin", "robot"]) == 1
+
+
+def test_whoami_mismatch(home: Path) -> None:
+    add_sim("duck-1")
+    bind_offline("agent-1")
+    assert main(["whoami", "--offline", "--agent-id", "agent-2"]) == 1
 
 
 def test_invalid_body_kind(home: Path) -> None:
-    run(["whoami", "--offline", "--agent-id", "agent-1"])
-    assert main(["body", "add", "--kind", "Unitree G1"]) == 1
+    assert main(["body", "add", "--kind", "Unitree G1", "--origin", "sim"]) == 1
 
 
 def test_non_microduck_has_no_session_adapter(home: Path) -> None:
-    run(["whoami", "--offline", "--agent-id", "agent-1"])
-    run(["body", "add", "--kind", "unitree-g1", "--name", "g1"])
+    run(["body", "add", "--kind", "unitree-g1", "--origin", "sim", "--name", "g1"])
+    bind_offline()
     body = load().body_by_token("g1")
     assert body is not None
     assert body.adapter == "none"
@@ -194,6 +226,8 @@ def test_v1_state_migrates(home: Path) -> None:
     assert state.agent is not None and state.agent.agent_id == "agent-1"
     assert len(state.bodies) == 1
     assert state.bodies[0].policy_by_alias("walk") is not None
+    assert state.bodies[0].origin == "sim"
+    assert state.bodies[0].bound_agent_id == "agent-1"
     save(state)
     again = State.from_dict(json.loads(path.read_text(encoding="utf-8")))
     assert again.agent is not None
@@ -224,9 +258,10 @@ def test_session_per_body_and_adapter_one_sim(
     home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     skill = _mock_skill(tmp_path, monkeypatch)
-    run(["whoami", "--offline", "--agent-id", "agent-1"])
-    run(["body", "add", "--kind", "microduck", "--name", "duck-1"])
-    run(["body", "add", "--kind", "microduck", "--name", "duck-2"])
+    add_sim("duck-1")
+    add_sim("duck-2")
+    bind_offline(body="duck-1")
+    bind_offline(body="duck-2")
     run(["policy", "attach", "--body", "duck-1", "--hub", "neil-jo/microduck-walk", "--as", "walk"])
     run(["policy", "attach", "--body", "duck-2", "--hub", "neil-jo/microduck-walk", "--as", "walk"])
     run(
@@ -286,8 +321,8 @@ def test_show_keeps_cards_when_runtime_status_fails(
     (skill / "scripts" / "control.sh").write_text(
         "#!/bin/sh\necho sim down >&2\nexit 1\n", encoding="utf-8"
     )
-    run(["whoami", "--offline", "--agent-id", "agent-1"])
-    run(["body", "add", "--kind", "microduck", "--name", "duck-1"])
+    add_sim("duck-1")
+    bind_offline()
     run(["policy", "attach", "--hub", "neil-jo/microduck-walk", "--as", "walk"])
     run(["session", "start", "--dry-run"])
     capsys.readouterr()

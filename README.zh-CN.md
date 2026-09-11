@@ -2,7 +2,7 @@
 
 不是一只机器人，也不是 SDK。是已加入 ACN 的 agent 获取、绑定、训练、管理、控制身体，并靠身体参与物理世界的工作台。Microduck 是第一种机型运行时——v0 探针，不是产品边界。
 
-**https://github.com/acnlabs/embody** — 缝合在 agent：ACN 认人协作，身体在这台机器上开。Embody 只为 `whoami` 打 ACN。
+**https://github.com/acnlabs/embody** — 主角是 agent：在这里创建 / 获取 / 绑定身体，协作在 ACN。Embody 只为 `bind` / `whoami` 打 ACN。
 
 [English README](README.md) · [v0 规格](docs/product/embody-v0.md) · [身体运行时](docs/product/body-runtime-v0.md) · [agent skill](skills/embody/)
 
@@ -18,7 +18,7 @@ microduck-plugin   第一种运行时 — v0 探针，不是本平台
 
 一只已 join 的 ACN agent 可以有多具身体。每具身体有自己的 `kind`。会话按 kind 找机型运行时。v0 开 Microduck 仿真；别的 kind 可以先记账。Microduck 运行时本机同时只稳跑一场。
 
-Join 不会自动有身体。Hub 卡由 agent 自己找；`policy attach` 只收指针。权重只放 Hub。`show` / `status` 给卡片和数字；回 ACN 是 agent 自己的事。第二种机型、真机配对、训练 CLI 不进本探针。
+Join 不会自动有身体。agent 先 `--origin sim` 创建（真机配对不进本探针），再 `bind`，再 `whoami`。Hub 卡由 agent 自己找；`policy attach` 只收指针。`show` / `status` 给卡片和数字；回 ACN 是 agent 自己的事。第二种机型、训练 CLI 不进本探针。
 
 ## 安装
 
@@ -32,8 +32,9 @@ python3 -m pip install -e .
 
 ```bash
 export ACN_API_KEY=acn_...          # 来自 POST /agents/join
-python3 -m embody whoami
-python3 -m embody body add --kind microduck --name duck-1
+python3 -m embody body add --kind microduck --origin sim --name duck-1
+python3 -m embody bind --body duck-1
+python3 -m embody whoami --body duck-1
 python3 -m embody policy attach --body duck-1 --hub neil-jo/microduck-walk --as walk
 python3 -m embody session start --body duck-1
 python3 -m embody status

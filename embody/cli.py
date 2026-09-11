@@ -8,6 +8,8 @@ from typing import Any
 from embody.acn import AcnError, acn_base_url, api_key, fetch_me
 from embody.adapters import AdapterError, adapter_id_for, guard_concurrency, run as run_adapter, validate_kind
 from embody.models import (
+    ORIGIN_ROBOT,
+    ORIGIN_SIM,
     AgentBind,
     Body,
     Policy,
@@ -17,6 +19,7 @@ from embody.models import (
     hub_resolve,
     new_id,
     utc_now,
+    validate_origin,
 )
 from embody.show import body_card, show_for
 from embody.store import load, save
@@ -31,85 +34,132 @@ def _dump(payload: dict[str, Any]) -> int:
     return 0
 
 
-def _require_agent(state: State) -> AgentBind:
-    if state.agent is None:
-        raise CliError("no agent bound — run: python3 -m embody whoami")
-    return state.agent
+def _body_name(body: Body) -> str:
+    return body.name or body.id
 
 
-def _resolve_body(state: State, token: str | None) -> Body:
-    _require_agent(state)
+def _resolve_body(state: State, token: str | None, *, need_bound: bool = True) -> Body:
     if not state.bodies:
-        raise CliError("no bodies — run: python3 -m embody body add --kind microduck")
+        raise CliError(
+            "no bodies — create one: python3 -m embody body add --kind microduck --origin sim"
+        )
     if token:
         body = state.body_by_token(token)
         if body is None:
-            known = ", ".join(b.name or b.id for b in state.bodies)
+            known = ", ".join(_body_name(b) for b in state.bodies)
             raise CliError(f"unknown --body {token!r}; have: {known}")
-        return body
-    if len(state.bodies) == 1:
-        return state.bodies[0]
-    known = ", ".join(b.name or b.id for b in state.bodies)
-    raise CliError(f"multiple bodies; pass --body ({known})")
+    elif len(state.bodies) == 1:
+        body = state.bodies[0]
+    else:
+        known = ", ".join(_body_name(b) for b in state.bodies)
+        raise CliError(f"multiple bodies; pass --body ({known})")
+    if need_bound and not body.bound_agent_id:
+        raise CliError(
+            f"{_body_name(body)} is not bound — run: python3 -m embody bind --body {_body_name(body)}"
+        )
+    return body
+
+
+def _read_acn_agent(args: argparse.Namespace) -> tuple[str, bool, str | None]:
+    if args.offline:
+        if not args.agent_id:
+            raise CliError("--offline requires --agent-id")
+        return str(args.agent_id), False, None
+    me = fetch_me()
+    agent_id = str(me["agent_id"])
+    if args.agent_id and args.agent_id != agent_id:
+        raise CliError(f"--agent-id {args.agent_id} does not match ACN /agents/me ({agent_id})")
+    return agent_id, True, acn_base_url()
 
 
 def cmd_whoami(args: argparse.Namespace) -> int:
     state = load()
-    bind = bool(args.offline or args.agent_id or api_key())
-    if not bind and args.refresh:
+    body = _resolve_body(state, args.body, need_bound=False)
+    if not body.bound_agent_id:
+        raise CliError(
+            f"{_body_name(body)} is not bound — run: python3 -m embody bind --body {_body_name(body)}"
+        )
+    has_cred = bool(args.offline or args.agent_id or api_key())
+    if args.refresh and not has_cred:
         raise CliError("whoami --refresh needs ACN_API_KEY or --offline --agent-id")
-    if not bind:
-        if state.agent is None:
-            raise CliError("no agent bound — export ACN_API_KEY and run: python3 -m embody whoami")
-        return _dump({"ok": True, "agent": state.agent.to_dict(), "bodies": len(state.bodies)})
+    if not has_cred:
+        return _dump(
+            {
+                "ok": True,
+                "body": body.to_dict(),
+                "agent": None if state.agent is None else state.agent.to_dict(),
+                "note": "local bind. Export ACN_API_KEY so this body can ask ACN.",
+            }
+        )
+    agent_id, verified, base = _read_acn_agent(args)
+    if agent_id != body.bound_agent_id:
+        raise CliError(
+            f"this body is bound to {body.bound_agent_id}; ACN says {agent_id}. "
+            f"re-bind: python3 -m embody bind --body {_body_name(body)} --replace"
+        )
+    if state.agent is not None:
+        state.agent.verified = verified
+        state.agent.acn_base_url = base
+        save(state)
+    return _dump(
+        {
+            "ok": True,
+            "match": True,
+            "body": body.to_dict(),
+            "agent": None if state.agent is None else state.agent.to_dict(),
+            "note": "this body asked ACN who it is bound to",
+        }
+    )
 
-    if args.offline:
-        agent_id = args.agent_id
-        if not agent_id:
-            raise CliError("--offline requires --agent-id")
-        verified = False
-        base = None
-    else:
-        me = fetch_me()
-        agent_id = str(me["agent_id"])
-        if args.agent_id and args.agent_id != agent_id:
-            raise CliError(f"--agent-id {args.agent_id} does not match ACN /agents/me ({agent_id})")
-        verified = True
-        base = acn_base_url()
 
+def cmd_bind(args: argparse.Namespace) -> int:
+    state = load()
+    body = _resolve_body(state, args.body, need_bound=False)
+    agent_id, verified, base = _read_acn_agent(args)
+    if body.bound_agent_id and body.bound_agent_id != agent_id and not args.replace:
+        raise CliError(
+            f"{_body_name(body)} is bound to {body.bound_agent_id}; pass --replace"
+        )
     if state.agent and state.agent.agent_id != agent_id and not args.replace:
         raise CliError(
-            f"this machine is bound to {state.agent.agent_id}; pass --replace to switch"
+            f"this workplace has agent {state.agent.agent_id}; pass --replace to switch"
         )
-    if state.agent and state.agent.agent_id != agent_id and args.replace:
-        state.bodies = []
-
+    if args.replace and state.agent and state.agent.agent_id != agent_id:
+        for other in state.bodies:
+            if other.id != body.id:
+                other.bound_agent_id = None
     state.agent = AgentBind(
         agent_id=agent_id,
         bound_at=utc_now(),
         verified=verified,
         acn_base_url=base,
     )
+    body.bound_agent_id = agent_id
     path = save(state)
     return _dump(
         {
             "ok": True,
             "agent": state.agent.to_dict(),
-            "bodies": len(state.bodies),
+            "body": body.to_dict(),
             "state": str(path),
-            "note": "join does not attach a body",
+            "note": "body ↔ agent. whoami asks ACN to confirm. Join does not create a body.",
         }
     )
 
 
 def cmd_claim(_args: argparse.Namespace) -> int:
-    raise CliError("claim is gone — bind this machine with: python3 -m embody whoami")
+    raise CliError(
+        "claim is gone — create a body, then bind: "
+        "python3 -m embody body add --kind microduck --origin sim && python3 -m embody bind"
+    )
 
 
 def cmd_body_add(args: argparse.Namespace) -> int:
     kind = validate_kind(args.kind)
+    origin = validate_origin(args.origin)
+    if origin == ORIGIN_ROBOT:
+        raise CliError("real-robot pair is out of this probe. Create a sim: --origin sim")
     state = load()
-    agent = _require_agent(state)
     name = args.name
     if name and any(b.name == name for b in state.bodies):
         raise CliError(f"body name {name!r} already exists")
@@ -117,6 +167,7 @@ def cmd_body_add(args: argparse.Namespace) -> int:
     body = Body(
         id=local_id,
         kind=kind,
+        origin=origin,
         asset_ref=asset_ref("body", local_id),
         adapter=adapter_id_for(kind),
         registered_at=utc_now(),
@@ -124,18 +175,21 @@ def cmd_body_add(args: argparse.Namespace) -> int:
     )
     state.bodies.append(body)
     path = save(state)
-    payload = {"ok": True, "agent_id": agent.agent_id, "body": body.to_dict(), "state": str(path)}
+    payload = {
+        "ok": True,
+        "body": body.to_dict(),
+        "state": str(path),
+        "note": f"created origin={origin}. Bind next: python3 -m embody bind --body {_body_name(body)}",
+    }
     if body.adapter == "none":
-        payload["note"] = (
-            f"kind={kind!r} has no kind runtime yet. "
-            "You can attach policies; session start/do will fail until a runtime exists."
+        payload["note"] += (
+            f" kind={kind!r} has no runtime yet; session waits until one exists."
         )
     return _dump(payload)
 
 
 def cmd_body_list(_args: argparse.Namespace) -> int:
     state = load()
-    _require_agent(state)
     return _dump(
         {
             "ok": True,
@@ -230,6 +284,10 @@ def cmd_session_prepare(args: argparse.Namespace) -> int:
 def cmd_session_start(args: argparse.Namespace) -> int:
     state = load()
     body = _resolve_body(state, args.body)
+    if body.origin != ORIGIN_SIM:
+        raise CliError(
+            f"{_body_name(body)} origin={body.origin} has no session in this probe"
+        )
     policy = _startable_policy(body, args.as_name)
     guard_concurrency(state, body)
     adapter = run_adapter(body, "start", policy=policy, dry_run=bool(args.dry_run))
@@ -330,9 +388,8 @@ def cmd_status(_args: argparse.Namespace) -> int:
 
 def cmd_show(args: argparse.Namespace) -> int:
     state = load()
-    _require_agent(state)
     if args.body or len(state.bodies) == 1:
-        body = _resolve_body(state, args.body)
+        body = _resolve_body(state, args.body, need_bound=False)
         adapter = None
         numbers_error = None
         if body.session is not None:
@@ -358,18 +415,22 @@ def cmd_show(args: argparse.Namespace) -> int:
 
 
 def registry_payload(state: State) -> dict[str, Any]:
-    agent = _require_agent(state)
+    if not any(b.bound_agent_id for b in state.bodies):
+        raise CliError("no bound bodies — create, then bind")
     assets: list[dict[str, Any]] = []
     for body in state.bodies:
+        if not body.bound_agent_id:
+            continue
         assets.append(
             {
                 "asset_ref": body.asset_ref,
                 "source": "embody",
                 "asset_kind": "body",
                 "owner_type": "agent",
-                "owner_id": agent.agent_id,
-                "display_name": body.name or f"{body.kind} body",
-                "bound_agent_id": agent.agent_id,
+                "owner_id": body.bound_agent_id,
+                "display_name": body.name or f"{body.kind} {body.origin}",
+                "bound_agent_id": body.bound_agent_id,
+                "origin": body.origin,
             }
         )
         for policy in body.policies:
@@ -379,9 +440,9 @@ def registry_payload(state: State) -> dict[str, Any]:
                     "source": "embody",
                     "asset_kind": "policy",
                     "owner_type": "agent",
-                    "owner_id": agent.agent_id,
+                    "owner_id": body.bound_agent_id,
                     "display_name": policy.alias,
-                    "bound_agent_id": agent.agent_id,
+                    "bound_agent_id": body.bound_agent_id,
                     "preview_url": policy.preview_url,
                 }
             )
@@ -410,20 +471,28 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sub = parser.add_subparsers(dest="cmd", required=True)
 
-    who = sub.add_parser("whoami", help="bind / show the ACN agent on this machine")
+    who = sub.add_parser("whoami", help="this body asks ACN who it is bound to")
     who.add_argument("--agent-id")
     who.add_argument("--offline", action="store_true", help="skip /agents/me (tests / airgap)")
-    who.add_argument("--replace", action="store_true", help="switch agent and drop local bodies")
     who.add_argument("--refresh", action="store_true")
+    _add_body_flag(who)
     who.set_defaults(func=cmd_whoami)
+
+    bound = sub.add_parser("bind", help="bind this body to the ACN agent")
+    bound.add_argument("--agent-id")
+    bound.add_argument("--offline", action="store_true", help="skip /agents/me (tests / airgap)")
+    bound.add_argument("--replace", action="store_true", help="switch agent; unbind other bodies")
+    _add_body_flag(bound)
+    bound.set_defaults(func=cmd_bind)
 
     claim = sub.add_parser("claim", help=argparse.SUPPRESS)
     claim.set_defaults(func=cmd_claim)
 
-    body = sub.add_parser("body", help="add / list bodies (many per agent)")
+    body = sub.add_parser("body", help="create / list bodies (many per agent)")
     body_sub = body.add_subparsers(dest="body_cmd", required=True)
-    add = body_sub.add_parser("add")
+    add = body_sub.add_parser("add", help="create a body; say --origin sim or robot")
     add.add_argument("--kind", default="microduck")
+    add.add_argument("--origin", required=True, help="sim (create) or robot (acquire; v0 refuses)")
     add.add_argument("--name")
     add.set_defaults(func=cmd_body_add)
     listed = body_sub.add_parser("list")

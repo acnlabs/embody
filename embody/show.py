@@ -22,6 +22,8 @@ def lift_runtime_numbers(adapter: dict[str, Any]) -> dict[str, Any] | None:
 
 
 def next_hint(body: Body) -> str:
+    if not body.bound_agent_id:
+        return "bind this body to the agent, then whoami"
     if not body.policies:
         return "find a Hub USER/NAME with policy.onnx yourself, then policy attach --hub"
     if body.session is None:
@@ -52,6 +54,8 @@ def body_card(body: Body) -> dict[str, Any]:
         "id": body.id,
         "name": body.name,
         "kind": body.kind,
+        "origin": body.origin,
+        "bound_agent_id": body.bound_agent_id,
         "asset_ref": body.asset_ref,
         "session_running": body.session is not None,
         "session": None if body.session is None else body.session.to_dict(),

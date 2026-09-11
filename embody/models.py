@@ -8,6 +8,15 @@ from uuid import uuid4
 
 SOURCE = "embody"
 STATE_VERSION = 2
+ORIGIN_SIM = "sim"
+ORIGIN_ROBOT = "robot"
+ORIGINS = {ORIGIN_SIM, ORIGIN_ROBOT}
+
+
+def validate_origin(origin: str) -> str:
+    if origin not in ORIGINS:
+        raise ValueError(f"origin must be sim or robot, not {origin!r}")
+    return origin
 
 
 def utc_now() -> str:
@@ -99,6 +108,8 @@ class Body:
     asset_ref: str
     adapter: str
     registered_at: str
+    origin: str = ORIGIN_SIM
+    bound_agent_id: str | None = None
     name: str | None = None
     policies: list[Policy] = field(default_factory=list)
     session: Session | None = None
@@ -108,6 +119,8 @@ class Body:
             "id": self.id,
             "name": self.name,
             "kind": self.kind,
+            "origin": self.origin,
+            "bound_agent_id": self.bound_agent_id,
             "asset_ref": self.asset_ref,
             "adapter": self.adapter,
             "registered_at": self.registered_at,
@@ -119,12 +132,15 @@ class Body:
     def from_dict(cls, data: dict[str, Any]) -> Body:
         policies = [Policy.from_dict(p) for p in data.get("policies") or []]
         session = data.get("session")
+        bound = data["bound_agent_id"] if "bound_agent_id" in data else None
         return cls(
             id=str(data["id"]),
             kind=str(data["kind"]),
             asset_ref=str(data["asset_ref"]),
             adapter=str(data["adapter"]),
             registered_at=str(data["registered_at"]),
+            origin=str(data.get("origin") or ORIGIN_SIM),
+            bound_agent_id=str(bound) if bound else None,
             name=data.get("name"),
             policies=policies,
             session=None if session is None else Session.from_dict(session),
@@ -158,10 +174,17 @@ class State:
         if data.get("bodies") is None and (data.get("claim") or data.get("body") or data.get("agent")):
             return cls._from_v1(data)
         agent = data.get("agent")
+        bind = None if agent is None else AgentBind.from_dict(agent)
+        bodies: list[Body] = []
+        for raw in data.get("bodies") or []:
+            body = Body.from_dict(raw)
+            if "bound_agent_id" not in raw and bind is not None:
+                body.bound_agent_id = bind.agent_id
+            bodies.append(body)
         return cls(
             version=int(data.get("version") or STATE_VERSION),
-            agent=None if agent is None else AgentBind.from_dict(agent),
-            bodies=[Body.from_dict(b) for b in data.get("bodies") or []],
+            agent=bind,
+            bodies=bodies,
         )
 
     @classmethod
@@ -174,6 +197,8 @@ class State:
             migrated.policies = [Policy.from_dict(p) for p in data.get("policies") or []]
             session = data.get("session")
             migrated.session = None if session is None else Session.from_dict(session)
+            if raw_agent:
+                migrated.bound_agent_id = str(raw_agent["agent_id"])
             bodies.append(migrated)
         return cls(
             version=STATE_VERSION,

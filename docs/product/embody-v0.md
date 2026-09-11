@@ -21,11 +21,19 @@ Do not name the repo embody-studio or embot. `embot` is spoken language for an a
 
 ## Effect
 
-An agent uses Embody to **get, bind, train, manage, and control** bodies of various kinds (simulation and real machines). The same agent collaborates on ACN. Embodiment binds to the agent. Embody talks to ACN only to bind identity (`whoami` / `/agents/me`). They do not talk about tasks or control.
+The **agent** is the protagonist. It comes to Embody to **create, acquire, and bind** a body, then train / manage / control it. The same agent collaborates on ACN. Embody talks to ACN only for bind / `whoami` (`/agents/me`). They do not talk about tasks or control.
 
 ```text
 ACN  ←→  agent  ←→  body on this machine (Embody)
-     tasks, collab      bind + drive
+     tasks, collab      create / bind / drive
+```
+
+```text
+agent arrives
+  → create (sim) or acquire (robot) a body — origin is written on the body
+  → bind that body to the agent
+  → that body whoami: asks ACN who it is bound to
+  → attach cards, drive, read numbers; agent replies on ACN
 ```
 
 The agent is the only stitch between collaboration and the body. Embody does not store task ids, fetch work, or write back to ACN. ACN does not send joint commands.
@@ -34,7 +42,7 @@ The agent is the only stitch between collaboration and the body. Embody does not
 
 ```text
 ACN                  identity / messages / tasks / wallet
-                     collaboration. whoami reads agent_id. Not a body remote.
+                     collaboration. bind / whoami read agent_id. Not a body remote.
 AgentPlanet          launch / Credits / embed / Store
                      not the body ledger, not the control plane
 embody               workplace on this machine
@@ -45,11 +53,13 @@ Hub                  weights. Agent finds the card. attach stores a pointer.
 ```
 
 ```text
-ACN agent (identity)
-  → whoami (bind this machine)
+ACN agent (protagonist)
+  → body add --origin sim      (create; robot acquire is out of this probe)
+  → bind                       (this body ↔ this agent)
+  → whoami                     (this body asks ACN who it is bound to)
   → agent finds a Hub card
-  → body add / policy attach   (local)
-  → studio session             (local → kind runtime → sim or later robot)
+  → policy attach              (local)
+  → studio session             (local → kind runtime; origin=sim)
 ```
 
 - Not part of the AgentPlanet monorepo.
@@ -67,13 +77,13 @@ One joined agent → many bodies. Each body → many Hub policies and its own se
 
 A body has a `kind` (machine type). Session verbs dispatch to that kind's **runtime**. The runtime is a seam so a second machine does not copy Microduck into the kernel. It is not a plugin store. v0 ships one runtime: `microduck` → [microduck-skill](https://github.com/acnlabs/microduck-plugin). Other slugs may be recorded; session errors until a runtime exists. The Microduck runtime also refuses a second localhost sim — runtime limit, not a kernel rule.
 
-Join does not attach a body. `whoami` only binds this machine to an `agent_id`. A body is a machine type (`kind`), not a sim/real split. Sim vs robot is session `venue` — see [body-runtime-v0.md](./body-runtime-v0.md). v0 sessions are `venue=sim`.
+Join does not create or attach a body. The agent creates or acquires one first; `origin` is `sim` or `robot` at birth. Same `kind`, not `microduck-sim` / `microduck-real`. `bind` writes body ↔ agent. `whoami` is that body asking ACN. v0 create is `--origin sim` only. See [body-runtime-v0.md](./body-runtime-v0.md).
 
 ## Objects
 
 | Object | `asset_ref` | `asset_kind` | Meaning |
 |---|---|---|---|
-| Body | `embody:body:{id}` | `body` | A machine-type slot (`kind` slug). Sim and robot share this body; they are session venues. |
+| Body | `embody:body:{id}` | `body` | A machine-type slot (`kind` + `origin`). Sim and robot are birth origin, not two kinds. |
 | Policy | `embody:policy:{id}` | `policy` | Pointer at a Hub graph (`policy.onnx`). One trick, one graph. |
 
 These rows live in `$EMBODY_HOME` (default `~/.embody/state.json`). That file is the workplace ledger on this machine. It is not an ACN profile and not an AgentPlanet registry.
@@ -84,11 +94,11 @@ Policy preview: `https://huggingface.co/{repo}/resolve/main/preview.mp4`. A raw 
 
 | Verb | North star | v0 probe |
 |---|---|---|
-| Acquire | Add a kind, hang a Hub card, later pair a real unit | `body add`, `policy attach` |
-| Bind | This machine ↔ agent; this robot ↔ body | `whoami` |
+| Acquire | Create a sim or later acquire a real unit | `body add --origin sim` (robot pair out of probe) |
+| Bind | This body ↔ this agent; body asks ACN | `bind`, then `whoami` |
 | Train | Studio verb; the kind runtime trains (no generic PPO in the kernel) | Runtime only. No `train` in this kernel. |
 | Manage | Many bodies, many cards, venues | `body` / `policy` list, attach |
-| Control | Session on sim or robot | `prepare` / `start` / `pull` / `do` / `status` / `stop` (`venue=sim`) |
+| Control | Session on the body's origin | `prepare` / `start` / `pull` / `do` / `status` / `stop` (v0: `origin=sim`) |
 | Show | Card + numbers | `show` / `status` / `session status`: Hub preview + onnx; live `numbers` pass through. No fallen verdict. Agent replies on ACN. |
 
 Datacollect and real-robot lines stay in the kind runtime. Real-robot commands print by default. JSONL does not enter official PPO.
@@ -116,7 +126,7 @@ Out of this probe: Jobs training CLI, real-robot pair, Credits, a second body ki
 |---|---|---|
 | ACN | Identity, tasks, collaboration with the **agent**. Optional later: a public nameplate. | Session verbs. Joint commands. Own the workplace ledger. Talk to the body. |
 | AgentPlanet | Launch / Credits / embed / Store. | Body title. Body remote. Charge `source=embody`. |
-| embody | Bind this machine to the agent. Acquire / train (dispatch) / manage / control the body. | Call ACN about tasks. Store task ids. Search Hub. |
+| embody | Create / bind a body on this machine. Train (dispatch) / manage / control. | Call ACN about tasks. Store task ids. Search Hub. Bind the laptop instead of the body. |
 | kind runtime | Train and move this machine type. | Become the platform. Rank Hub cards for the workplace. |
 
 `registry print` dumps the **local** ledger. It does not POST.

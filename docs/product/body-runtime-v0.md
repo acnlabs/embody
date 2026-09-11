@@ -15,30 +15,23 @@ studio / CLI
             → vendor sim / firmware
 ```
 
-Kernel: bind agent, many bodies, attach cards the agent chose, dispatch verbs on this machine.  
+Kernel: agent creates a body (origin at birth), binds it, asks whoami, attaches cards, dispatches verbs.  
 Kind runtime: trainer, ONNX shape, localhost control, vendor install lines.
 
 Session verbs never go to ACN or AgentPlanet. Embody does not store ACN task ids. Hub discovery is the agent's job. This contract does not search.
 
 ## How an agent gets a body
 
-Join ACN does not attach a body and does not remote-control one. `whoami` only binds this machine to an `agent_id`.
+The agent is the protagonist. Join ACN does not create a body. Origin is written at birth.
 
-| Path | Meaning |
-|---|---|
-| Sim slot | `body add --kind …` — record a body of that machine type. Studio can open a sim session. |
-| Real machine | Pair later: this physical unit belongs to the agent. Same body, not a second `kind`. |
+| Path | Meaning | v0 |
+|---|---|---|
+| Create | `body add --kind … --origin sim` — this machine opens a sim of that kind. | yes |
+| Acquire | `--origin robot` — pair a physical unit. Same `kind`, not a second body. | out of probe |
+| Bind | `bind` — this body ↔ this agent. | yes |
+| Confirm | `whoami` — this body asks ACN who it is bound to. | yes |
 
-Do not mint `microduck-sim` and `microduck-real` as two bodies. Same Hub cards run on both venues.
-
-## Body vs venue
-
-| Term | Meaning |
-|---|---|
-| `body` | Machine type identity (`kind=microduck`, …). One agent may have many. |
-| `venue` | Where this session runs: `sim` or `robot`. |
-
-v0 CLI sessions are `venue=sim`. `venue=robot` is in the contract; runtimes still print install lines by default and do not run them unless a human owns that machine and asked.
+Do not mint `microduck-sim` and `microduck-real` as two bodies. Same Hub cards. Session follows the body's `origin`. v0 only starts `origin=sim`.
 
 ## Policy card
 
@@ -58,8 +51,8 @@ Studio always uses these names. Missing verb → adapter error, not a kernel fal
 
 | Verb | Meaning | Perpetual | Episodic |
 |---|---|---|---|
-| `prepare` | Make `venue=sim` startable on this machine. No-op if already ready. Not train, not cloud sim, not robot pair. | required | required |
-| `start` | Kernel calls `prepare` first. Then open a session (`venue=sim` today) using a perpetual card | required | refuse |
+| `prepare` | Make `origin=sim` startable on this machine. No-op if already ready. Not train, not cloud sim, not robot pair. | required | required |
+| `start` | Kernel calls `prepare` first. Then open a session on this body's origin (v0: `sim`) using a perpetual card | required | refuse |
 | `pull` | Load a named card into the running session | optional | required before `do` |
 | `do` | Fire a named episodic card | n/a | required |
 | `status` | Numbers only (`tilt`, feet, joints, …). Kernel lifts runtime JSON as `show.numbers`. No fallen verdict | required | required |
