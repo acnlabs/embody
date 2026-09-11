@@ -10,6 +10,7 @@ from embody import adapter_microduck
 from embody.adapters import get_runtime
 from embody.cli import main
 from embody.models import State, asset_ref, hub_resolve
+from embody.show import lift_runtime_numbers
 from embody.store import load, save, state_path
 
 
@@ -23,6 +24,14 @@ def home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 def run(argv: list[str]) -> dict:
     assert main(argv) == 0
     return load().to_dict()
+
+
+def test_lift_runtime_numbers() -> None:
+    raw = {"tilt_deg": 4.2, "ok": True, "feet": {"left": {"contact": True}}}
+    assert lift_runtime_numbers({"stdout": json.dumps(raw)}) == raw
+    assert lift_runtime_numbers({"stdout": "not-json\n"}) is None
+    assert lift_runtime_numbers({"stdout": ""}) is None
+    assert lift_runtime_numbers({}) is None
 
 
 def test_runtime_registry() -> None:
@@ -77,6 +86,25 @@ def test_whoami_body_policy_registry(home: Path, capsys: pytest.CaptureFixture[s
     assert kinds == {"body", "policy"}
     for row in printed["assets"]:
         assert row["owner_id"] == "agent-1"
+
+    capsys.readouterr()
+    assert main(["status"]) == 0
+    workplace = json.loads(capsys.readouterr().out)
+    assert workplace["note"].startswith("local workplace")
+    card = workplace["show"][0]
+    aliases = {row["alias"] for row in card["cards"]}
+    assert aliases == {"walk", "polite_bow"}
+    walk_card = next(row for row in card["cards"] if row["alias"] == "walk")
+    assert walk_card["mode"] == "perpetual"
+    assert walk_card["onnx"].endswith("/policy.onnx")
+    assert walk_card["preview"].endswith("/preview.mp4")
+    assert card["next"] == "session start"
+
+    capsys.readouterr()
+    assert main(["show"]) == 0
+    shown = json.loads(capsys.readouterr().out)
+    assert shown["show"][0]["numbers"] is None
+    assert shown["show"][0]["cards"]
 
 
 def test_many_bodies_need_flag(home: Path) -> None:
@@ -177,7 +205,12 @@ def _mock_skill(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     scripts.mkdir(parents=True)
     (skill / "SKILL.md").write_text("# microduck-skill\n", encoding="utf-8")
     control = scripts / "control.sh"
-    control.write_text("#!/bin/sh\necho mock\n", encoding="utf-8")
+    control.write_text(
+        "#!/bin/sh\n"
+        'if [ "$1" = "status" ]; then echo \'{"tilt_deg": 1.5, "ok": true}\'; exit 0; fi\n'
+        "echo mock\n",
+        encoding="utf-8",
+    )
     control.chmod(0o755)
     doctor = scripts / "doctor.sh"
     doctor.write_text("#!/bin/sh\necho doctor ok\n", encoding="utf-8")
@@ -187,7 +220,7 @@ def _mock_skill(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 def test_session_per_body_and_adapter_one_sim(
-    home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     skill = _mock_skill(tmp_path, monkeypatch)
     run(["whoami", "--offline", "--agent-id", "agent-1"])
@@ -215,6 +248,15 @@ def test_session_per_body_and_adapter_one_sim(
     assert load().body_by_token("duck-1") is not None
     assert load().body_by_token("duck-1").session is not None
     assert load().body_by_token("duck-1").session.start_hub == "neil-jo/microduck-walk"
+    capsys.readouterr()
+    assert main(["session", "status", "--body", "duck-1"]) == 0
+    live = json.loads(capsys.readouterr().out)
+    assert live["show"]["numbers"] == {"tilt_deg": 1.5, "ok": True}
+    assert live["show"]["cards"]
+    capsys.readouterr()
+    assert main(["show", "--body", "duck-1"]) == 0
+    shown = json.loads(capsys.readouterr().out)
+    assert shown["show"][0]["numbers"] == {"tilt_deg": 1.5, "ok": True}
     assert main(["session", "start", "--body", "duck-2", "--dry-run"]) == 1
     assert main(["session", "pull", "--body", "duck-1", "--as", "polite_bow", "--dry-run"]) == 0
     assert main(["session", "do", "--body", "duck-1", "polite_bow", "--dry-run"]) == 0

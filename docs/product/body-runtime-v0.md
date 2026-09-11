@@ -62,7 +62,7 @@ Studio always uses these names. Missing verb → adapter error, not a kernel fal
 | `start` | Kernel calls `prepare` first. Then open a session (`venue=sim` today) using a perpetual card | required | refuse |
 | `pull` | Load a named card into the running session | optional | required before `do` |
 | `do` | Fire a named episodic card | n/a | required |
-| `status` | Numbers only (`tilt`, feet, joints, …). No fallen verdict | required | required |
+| `status` | Numbers only (`tilt`, feet, joints, …). Kernel lifts runtime JSON as `show.numbers`. No fallen verdict | required | required |
 | `stop` | End this body's session | required | required |
 
 `prepare` failed → do not `start`. The kernel never reads runtime-private paths (no `MICRODUCK_RL_ROOT` in embody). A runtime may set those only inside its process, including on later verbs (`pull` / `do` / `stop` are new CLI processes). A runtime may run a broader doctor; `prepare` succeeds when **sim is startable**, not when train/Jobs env is complete.

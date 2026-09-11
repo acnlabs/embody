@@ -18,7 +18,7 @@ microduck-plugin   first runtime — v0 probe, not the platform
 
 A joined ACN agent can have many bodies. Each body has a `kind`. Session goes to that kind's runtime. v0 drives Microduck sim; other kinds can be recorded. The Microduck runtime runs one localhost sim at a time.
 
-Join does not attach a body. The agent finds the Hub card; `policy attach` stores a pointer. Weights stay on the Hub. A second kind, real-robot pair, and a train CLI stay out of this probe.
+Join does not attach a body. The agent finds the Hub card; `policy attach` stores a pointer. Weights stay on the Hub. `show` / `status` expose cards and live numbers; the agent replies on ACN. A second kind, real-robot pair, and a train CLI stay out of this probe.
 
 ## Install
 

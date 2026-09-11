@@ -89,7 +89,7 @@ Policy preview: `https://huggingface.co/{repo}/resolve/main/preview.mp4`. A raw 
 | Train | Studio verb; the kind runtime trains (no generic PPO in the kernel) | Runtime only. No `train` in this kernel. |
 | Manage | Many bodies, many cards, venues | `body` / `policy` list, attach |
 | Control | Session on sim or robot | `prepare` / `start` / `pull` / `do` / `status` / `stop` (`venue=sim`) |
-| Show | Card + numbers | Hub preview URL; body card reports numbers only |
+| Show | Card + numbers | `show` / `status` / `session status`: Hub preview + onnx; live `numbers` pass through. No fallen verdict. Agent replies on ACN. |
 
 Datacollect and real-robot lines stay in the kind runtime. Real-robot commands print by default. JSONL does not enter official PPO.
 

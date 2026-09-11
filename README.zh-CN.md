@@ -18,7 +18,7 @@ microduck-plugin   第一种运行时 — v0 探针，不是本平台
 
 一只已 join 的 ACN agent 可以有多具身体。每具身体有自己的 `kind`。会话按 kind 找机型运行时。v0 开 Microduck 仿真；别的 kind 可以先记账。Microduck 运行时本机同时只稳跑一场。
 
-Join 不会自动有身体。Hub 卡由 agent 自己找；`policy attach` 只收指针。权重只放 Hub。第二种机型、真机配对、训练 CLI 不进本探针。
+Join 不会自动有身体。Hub 卡由 agent 自己找；`policy attach` 只收指针。权重只放 Hub。`show` / `status` 给卡片和数字；回 ACN 是 agent 自己的事。第二种机型、真机配对、训练 CLI 不进本探针。
 
 ## 安装
 

@@ -18,6 +18,7 @@ from embody.models import (
     new_id,
     utc_now,
 )
+from embody.show import body_card, lift_runtime_numbers
 from embody.store import load, save
 
 
@@ -283,10 +284,12 @@ def cmd_session_status(args: argparse.Namespace) -> int:
     return _dump(
         {
             "ok": True,
-            "body": body.to_dict(),
-            "session": None if body.session is None else body.session.to_dict(),
+            "show": {
+                **body_card(body),
+                "numbers": lift_runtime_numbers(adapter),
+                "note": "numbers only; do not invent a fallen verdict",
+            },
             "adapter": adapter,
-            "note": "body card reports numbers only; do not invent a fallen verdict",
         }
     )
 
@@ -311,7 +314,42 @@ def cmd_status(_args: argparse.Namespace) -> int:
             "workplace": "studio",
             "acn_key_present": bool(api_key()),
             "agent": None if state.agent is None else state.agent.to_dict(),
+            "show": [body_card(b) for b in state.bodies],
             "bodies": [b.to_dict() for b in state.bodies],
+            "note": "local workplace. You collaborate on ACN. Embody does not store task ids.",
+        }
+    )
+
+
+def cmd_show(args: argparse.Namespace) -> int:
+    state = load()
+    _require_agent(state)
+    if args.body or len(state.bodies) == 1:
+        body = _resolve_body(state, args.body)
+        numbers = None
+        adapter = None
+        if body.session is not None:
+            adapter = run_adapter(body, "status", dry_run=bool(args.dry_run))
+            numbers = lift_runtime_numbers(adapter)
+        payload: dict[str, Any] = {
+            "ok": True,
+            "show": [
+                {
+                    **body_card(body),
+                    "numbers": numbers,
+                    "note": "numbers only; do not invent a fallen verdict",
+                }
+            ],
+            "note": "cards + numbers. Reply on ACN yourself. Embody does not store task ids.",
+        }
+        if adapter is not None:
+            payload["adapter"] = adapter
+        return _dump(payload)
+    return _dump(
+        {
+            "ok": True,
+            "show": [body_card(b) for b in state.bodies],
+            "note": "many bodies; pass --body to lift live numbers. Reply on ACN yourself.",
         }
     )
 
@@ -432,8 +470,13 @@ def build_parser() -> argparse.ArgumentParser:
     _add_body_flag(stop)
     stop.set_defaults(func=cmd_session_stop)
 
-    st = sub.add_parser("status", help="local agent and bodies")
+    st = sub.add_parser("status", help="local agent, bodies, and cards")
     st.set_defaults(func=cmd_status)
+
+    shown = sub.add_parser("show", help="studio Show: cards + numbers")
+    shown.add_argument("--dry-run", action="store_true")
+    _add_body_flag(shown)
+    shown.set_defaults(func=cmd_show)
 
     registry = sub.add_parser("registry", help="print this machine's body ledger")
     registry_sub = registry.add_subparsers(dest="registry_cmd", required=True)
