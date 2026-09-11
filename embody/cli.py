@@ -126,8 +126,8 @@ def cmd_body_add(args: argparse.Namespace) -> int:
     payload = {"ok": True, "agent_id": agent.agent_id, "body": body.to_dict(), "state": str(path)}
     if body.adapter == "none":
         payload["note"] = (
-            f"kind={kind!r} has no session adapter yet. "
-            "You can attach policies; session start/do will fail until an adapter exists."
+            f"kind={kind!r} has no kind runtime yet. "
+            "You can attach policies; session start/do will fail until a runtime exists."
         )
     return _dump(payload)
 
@@ -365,7 +365,7 @@ def _add_body_flag(parser: argparse.ArgumentParser) -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="embody",
-        description="ACN agents get a body. Microduck is the first adapter.",
+        description="ACN agents get a body. Microduck is the first kind runtime.",
     )
     sub = parser.add_subparsers(dest="cmd", required=True)
 
@@ -388,7 +388,7 @@ def build_parser() -> argparse.ArgumentParser:
     listed = body_sub.add_parser("list")
     listed.set_defaults(func=cmd_body_list)
 
-    policy = sub.add_parser("policy", help="attach a Hub policy to a body")
+    policy = sub.add_parser("policy", help="attach a Hub policy the agent already chose")
     policy_sub = policy.add_subparsers(dest="policy_cmd", required=True)
     attach = policy_sub.add_parser("attach")
     attach.add_argument("--hub", required=True)

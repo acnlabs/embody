@@ -3,15 +3,15 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from embody.adapter_microduck import ADAPTER_ID, AdapterError as PackError, MicroduckRuntime
+from embody.adapter_microduck import ADAPTER_ID, AdapterError as KindError, MicroduckRuntime
 from embody.models import Body, Policy, State
 from embody.runtime import BodyRuntime, BodyRuntimeError
 
 
 KIND_RE = re.compile(r"^[a-z][a-z0-9_-]{0,31}$")
 
-# kind → pack. Kernel only looks up this table; it does not know control.sh.
-_PACKS: dict[str, BodyRuntime] = {
+# kind → runtime. Kernel only looks up this table; it does not know vendor scripts.
+_RUNTIMES: dict[str, BodyRuntime] = {
     MicroduckRuntime.kind: MicroduckRuntime(),
 }
 
@@ -27,25 +27,25 @@ def validate_kind(kind: str) -> str:
 
 
 def adapter_id_for(kind: str) -> str:
-    pack = _PACKS.get(kind)
-    return pack.adapter_id if pack is not None else "none"
+    runtime = _RUNTIMES.get(kind)
+    return runtime.adapter_id if runtime is not None else "none"
 
 
 def get_runtime(kind: str) -> BodyRuntime | None:
-    return _PACKS.get(kind)
+    return _RUNTIMES.get(kind)
 
 
 def guard_concurrency(state: State, body: Body) -> None:
-    pack = get_runtime(body.kind)
-    if pack is None:
+    runtime = get_runtime(body.kind)
+    if runtime is None:
         raise BodyRuntimeError(
-            f"no body-runtime pack for kind={body.kind!r}. "
-            "Record the body and attach cards; session waits until a pack exists. "
+            f"no kind runtime for kind={body.kind!r}. "
+            "Record the body and attach cards; session waits until a runtime exists. "
             "See docs/product/body-runtime-v0.md."
         )
     try:
-        pack.guard_start(state, body)
-    except PackError as exc:
+        runtime.guard_start(state, body)
+    except KindError as exc:
         raise BodyRuntimeError(str(exc)) from exc
 
 
@@ -57,37 +57,37 @@ def run(
     alias: str | None = None,
     dry_run: bool = False,
 ) -> dict[str, Any]:
-    pack = get_runtime(body.kind)
-    if pack is None:
+    runtime = get_runtime(body.kind)
+    if runtime is None:
         raise BodyRuntimeError(
-            f"no body-runtime pack for kind={body.kind!r}. "
+            f"no kind runtime for kind={body.kind!r}. "
             "See docs/product/body-runtime-v0.md."
         )
     try:
         if op == "prepare":
-            return pack.prepare(dry_run=dry_run)
+            return runtime.prepare(dry_run=dry_run)
         if op == "start":
             if policy is None:
                 raise BodyRuntimeError("start needs a perpetual policy card")
-            prepared = pack.prepare(dry_run=dry_run)
-            started = pack.start(policy, dry_run=dry_run)
+            prepared = runtime.prepare(dry_run=dry_run)
+            started = runtime.start(policy, dry_run=dry_run)
             return {**started, "prepare": prepared}
         if op == "pull":
             if policy is None:
                 raise BodyRuntimeError("pull needs a policy card")
-            return pack.pull(policy, dry_run=dry_run)
+            return runtime.pull(policy, dry_run=dry_run)
         if op == "do":
             if not alias:
                 raise BodyRuntimeError("do needs a policy alias")
-            return pack.do(alias, dry_run=dry_run)
+            return runtime.do(alias, dry_run=dry_run)
         if op == "status":
-            return pack.status(dry_run=dry_run)
+            return runtime.status(dry_run=dry_run)
         if op == "stop":
-            return pack.stop(dry_run=dry_run)
-    except PackError as exc:
+            return runtime.stop(dry_run=dry_run)
+    except KindError as exc:
         raise BodyRuntimeError(str(exc)) from exc
     raise BodyRuntimeError(f"unknown session verb {op!r}")
 
 
-# Re-export for callers that still mention the first pack id.
+# Re-export for callers that still mention the first runtime id.
 MICRODUCK_ADAPTER_ID = ADAPTER_ID

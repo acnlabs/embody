@@ -66,7 +66,7 @@ def run_control(*args: str, dry_run: bool = False) -> dict[str, object]:
 
 
 class MicroduckRuntime:
-    """First kind pack. Maps body-runtime verbs to microduck-skill control.sh."""
+    """First kind runtime. Maps body-runtime verbs to microduck-skill control.sh."""
 
     kind = KIND
     adapter_id = ADAPTER_ID
@@ -78,7 +78,7 @@ class MicroduckRuntime:
         other = busy[0]
         raise AdapterError(
             f"microduck-skill already has a session on {other.name or other.id}; "
-            "this pack runs one localhost sim at a time. "
+            "this runtime runs one localhost sim at a time. "
             f"Stop it: python3 -m embody session stop --body {other.name or other.id}"
         )
 

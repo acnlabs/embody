@@ -26,9 +26,9 @@ def run(argv: list[str]) -> dict:
 
 
 def test_runtime_registry() -> None:
-    pack = get_runtime("microduck")
-    assert pack is not None
-    assert pack.adapter_id == "microduck-skill"
+    runtime = get_runtime("microduck")
+    assert runtime is not None
+    assert runtime.adapter_id == "microduck-skill"
     assert get_runtime("unitree-g1") is None
 
 

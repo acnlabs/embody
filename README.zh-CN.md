@@ -1,24 +1,24 @@
 # Embody
 
-不是一只机器人，也不是 SDK。是已加入 ACN 的 agent 获得身体的地方。Microduck 是第一种身体。
+不是一只机器人，也不是 SDK。是已加入 ACN 的 agent 获取、绑定、训练、管理、控制身体，并靠身体参与物理世界的工作台。Microduck 是第一种机型运行时——v0 探针，不是产品边界。
 
-**https://github.com/acnlabs/embody** — 产品、仓库叫 `embody`。ACN 只认人。身体在这台机器上开。
+**https://github.com/acnlabs/embody** — ACN 认人接活。身体在这台机器上开。
 
 [English README](README.md) · [v0 规格](docs/product/embody-v0.md) · [身体运行时](docs/product/body-runtime-v0.md) · [agent skill](skills/embody/)
 
 ## 范围
 
 ```text
-ACN                身份 / 消息 / 任务 / 钱包 — 不是身体遥控器
+ACN                身份 / 消息 / 任务 / 钱包 — 协作，不是身体遥控器
 AgentPlanet        上新 / Credits / embed / Store — 不是身体账本
-embody             这台机器：绑定 agent、多具身体、studio 会话
-body runtime       Hub 卡 + prepare/start/pull/do/status/stop
-microduck-plugin   第一种机型包，不是本平台
+embody             工作台：获取 / 绑定 / 训练 / 管理 / 控制
+kind runtime       这种机器怎么训、怎么动
+microduck-plugin   第一种运行时 — v0 探针，不是本平台
 ```
 
-一只已 join 的 ACN agent 可以有多具身体。每具身体有自己的 `kind`。会话按 kind 找适配器。现在只有 `microduck` 能开仿真；别的 kind 可以先记账。Microduck 适配器本机同时只稳跑一场。
+一只已 join 的 ACN agent 可以有多具身体。每具身体有自己的 `kind`。会话按 kind 找机型运行时。v0 开 Microduck 仿真；别的 kind 可以先记账。Microduck 运行时本机同时只稳跑一场。
 
-Join 不会自动有身体。权重只放 Hub，不进本仓。训练、真机安装、Credits、第二种机型都不进 v0 内核。
+Join 不会自动有身体。Hub 卡由 agent 自己找；`policy attach` 只收指针。权重只放 Hub。第二种机型、真机配对、训练 CLI 不进本探针。
 
 ## 安装
 
@@ -28,7 +28,7 @@ cd embody
 python3 -m pip install -e .
 ```
 
-把 `EMBODY_MICRODUCK_SKILL` 指到 [microduck-plugin](https://github.com/acnlabs/microduck-plugin) 的 `skills/microduck-skill`，或把该仓放在 embody 旁边。`session start` 会先 `prepare`（由 pack 把仿真准备好）。不要手设 pack 内部变量（例如 `MICRODUCK_RL_ROOT`）。
+把 `EMBODY_MICRODUCK_SKILL` 指到 [microduck-plugin](https://github.com/acnlabs/microduck-plugin) 的 `skills/microduck-skill`，或把该仓放在 embody 旁边。`session start` 会先 `prepare`（由运行时把仿真准备好）。不要手设运行时内部变量（例如 `MICRODUCK_RL_ROOT`）。Hub 仓库自己找，再 attach。
 
 ```bash
 export ACN_API_KEY=acn_...          # 来自 POST /agents/join

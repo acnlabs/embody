@@ -6,7 +6,7 @@ from embody.models import Body, Policy, State
 
 
 class BodyRuntimeError(RuntimeError):
-    """Body-runtime failure (no pack, refused verb, or pack error)."""
+    """Body-runtime failure (no kind runtime, refused verb, or runtime error)."""
 
 
 class BodyRuntime(Protocol):
