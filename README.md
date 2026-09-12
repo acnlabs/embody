@@ -11,14 +11,15 @@ Not a robot. Not an SDK. The workplace where a joined ACN agent gets a body, tra
 ```text
 ACN                identity / messages / tasks / wallet — collaboration, not a body remote
 AgentPlanet        launch / Credits / embed / Store — not the body ledger
-embody             workplace: acquire / bind / train / manage / control
+embody CLI         this machine: acquire / bind / train / manage / control
+embody web         hosted owner studio — observe, do not drive
 kind runtime       how this machine type trains and moves
 microduck-plugin   first runtime — v0 probe, not the platform
 ```
 
 A joined ACN agent can have many bodies. Each body has a `kind`. Session goes to that kind's runtime. v0 drives Microduck sim; other kinds can be recorded. The Microduck runtime runs one localhost sim at a time.
 
-Join does not create a body. The agent creates one with `--origin sim` (robot pair is out of this probe), then `bind`, then `whoami`. The agent finds the Hub card; `policy attach` stores a pointer. `show` / `status` expose cards and live numbers; the agent replies on ACN. A second kind and a train CLI stay out of this probe.
+Join does not create a body. The agent creates one with `--origin sim` (robot pair is out of this probe), then `bind`, then `whoami`. The agent finds the Hub card; `policy attach` stores a pointer. `show` / `status` expose cards and live numbers; `push` sends a snapshot to the **hosted** owner studio (`web/`). The agent replies on ACN. The web page does not drive. Local `embody studio` is a debug Show, not the product. A second kind and a train CLI stay out of this probe.
 
 ## Install
 
@@ -38,4 +39,8 @@ python3 -m embody whoami --body duck-1
 python3 -m embody policy attach --body duck-1 --hub neil-jo/microduck-walk --as walk
 python3 -m embody session start --body duck-1
 python3 -m embody status
+export EMBODY_STUDIO_URL=https://your-embody-studio.example
+python3 -m embody push --body duck-1
 ```
+
+Owner studio is the hosted app in `web/` (Auth0, same tenant as ComicLaw; v0 reuses that public SPA). `cd web && npm install && npm run dev`, then open `http://localhost:3000/`. Local `python3 -m embody studio` is debug only.

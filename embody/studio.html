@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Embody studio · owner</title>
+  <style>
+    :root {
+      --bg: #12110f;
+      --ink: #f3efe6;
+      --muted: #9a9386;
+      --line: #2c2924;
+      --card: #1b1916;
+      --accent: #d4a056;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font: 16px/1.5 "Source Han Sans SC", "Noto Sans SC", "PingFang SC", sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+    }
+    header, main, footer { max-width: 52rem; margin: 0 auto; padding: 1.25rem 1.5rem; }
+    header h1 { font-size: 1.35rem; font-weight: 600; margin: 0 0 0.35rem; }
+    header p, .meta, footer { color: var(--muted); font-size: 0.92rem; }
+    .agent { margin-top: 0.75rem; }
+    .empty {
+      border: 1px dashed var(--line);
+      padding: 1.25rem;
+      color: var(--muted);
+    }
+    article {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 1rem 1.15rem;
+      margin: 1rem 0;
+    }
+    article h2 { margin: 0 0 0.4rem; font-size: 1.1rem; }
+    .row { display: flex; flex-wrap: wrap; gap: 0.4rem 1.1rem; color: var(--muted); font-size: 0.9rem; }
+    .on { color: var(--accent); }
+    ul { padding-left: 1.1rem; margin: 0.5rem 0 0; }
+    a { color: var(--accent); }
+    .numbers {
+      margin-top: 0.85rem;
+      font-variant-numeric: tabular-nums;
+    }
+    .numbers strong { color: var(--ink); font-weight: 600; }
+    .warn { color: #c9846a; }
+    code { font-size: 0.88em; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Embody studio</h1>
+    <p>本机调试 Show，<strong>不是产品</strong>。产品是托管的 owner studio。agent 开车，协作在 ACN。这里不搜 Hub、不拉工单、不发关节。</p>
+    <div id="agent" class="agent meta"></div>
+  </header>
+  <main id="bodies"></main>
+  <footer>本机观察面 · 数字原样展示，不评 fallen</footer>
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    function feet(n) {
+      const f = n && n.body_state && n.body_state.feet;
+      if (!f) return "—";
+      const side = (s) => {
+        const x = f[s] || {};
+        return (s === "left" ? "左" : "右") + (x.contact ? "接触" : "离地");
+      };
+      return side("left") + " / " + side("right");
+    }
+
+    function render(data) {
+      const agent = data.agent;
+      $("agent").textContent = agent
+        ? "agent " + agent.agent_id + (agent.verified ? " · ACN 已确认" : " · 本机绑定")
+        : "还没有绑定的 agent";
+      const root = $("bodies");
+      const rows = data.show || [];
+      if (!rows.length) {
+        root.innerHTML = '<div class="empty">还没有身体。agent 先 <code>body add --kind microduck --origin sim</code>，再 <code>bind</code>。</div>';
+        return;
+      }
+      root.innerHTML = rows.map((b) => {
+        const n = b.numbers || {};
+        const tilt = n.body_state && n.body_state.tilt_deg;
+        const z = n.body_state && n.body_state.trunk_z_m;
+        const cards = (b.cards || []).map((c) => (
+          "<li>" + c.alias + " · " + c.mode +
+          " · <a href=\"https://huggingface.co/" + c.hub + "\">" + c.hub + "</a>" +
+          " · 预览在模型卡上播，裸 resolve 会下载</li>"
+        )).join("");
+        let nums = "<p class=\"meta\">会话未开，没有实时数字。开车是 agent 的事。</p>";
+        if (b.numbers_error) {
+          nums = "<p class=\"warn\">数字读不到：" + b.numbers_error + "</p>";
+        } else if (b.numbers) {
+          nums = "<div class=\"numbers\">" +
+            "<div>policy <strong>" + (n.policy || "—") + "</strong>" +
+            (n.behavior ? " · 正在 " + n.behavior : "") +
+            (n.executed === true ? " · 刚执行" : "") + "</div>" +
+            "<div>tilt_deg <strong>" + (tilt == null ? "—" : Number(tilt).toFixed(2)) + "</strong>" +
+            " · trunk_z_m <strong>" + (z == null ? "—" : Number(z).toFixed(3)) + "</strong></div>" +
+            "<div>脚 " + feet(n) + "</div>" +
+            "<div class=\"meta\">只报数字，不评 fallen</div></div>";
+        }
+        return "<article><h2>" + (b.name || b.id) + "</h2>" +
+          "<div class=\"row\">" +
+          "<span>kind " + b.kind + "</span>" +
+          "<span>origin " + b.origin + "</span>" +
+          "<span>绑定 " + (b.bound_agent_id || "未绑") + "</span>" +
+          "<span class=\"" + (b.session_running ? "on" : "") + "\">" +
+          (b.session_running ? "会话进行中" : "无会话") + "</span></div>" +
+          "<p class=\"meta\">下一步（给 agent）：" + (b.next || "") + "</p>" +
+          "<ul>" + (cards || "<li>还没有卡</li>") + "</ul>" +
+          nums + "</article>";
+      }).join("");
+    }
+
+    async function tick() {
+      const res = await fetch("/api/show");
+      render(await res.json());
+    }
+    tick();
+    setInterval(tick, 2000);
+  </script>
+</body>
+</html>

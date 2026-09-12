@@ -3,7 +3,9 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from embody.adapters import AdapterError, run as run_adapter
 from embody.models import Body, hub_resolve
+from embody.store import load
 
 
 def lift_runtime_numbers(adapter: dict[str, Any]) -> dict[str, Any] | None:
@@ -47,6 +49,29 @@ def show_for(
     if numbers_error:
         payload["numbers_error"] = numbers_error
     return payload
+
+
+def live_show(body: Body) -> dict[str, Any]:
+    adapter = None
+    numbers_error = None
+    if body.session is not None:
+        try:
+            adapter = run_adapter(body, "status", dry_run=False)
+        except AdapterError as exc:
+            numbers_error = str(exc)
+    return show_for(body, adapter=adapter, numbers_error=numbers_error)
+
+
+def owner_payload() -> dict[str, Any]:
+    state = load()
+    return {
+        "ok": True,
+        "audience": "owner",
+        "workplace": "studio",
+        "agent": None if state.agent is None else state.agent.to_dict(),
+        "show": [live_show(b) for b in state.bodies],
+        "note": "Owner observation. The agent drives. Embody does not store task ids.",
+    }
 
 
 def body_card(body: Body) -> dict[str, Any]:

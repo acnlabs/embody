@@ -22,3 +22,6 @@ build/
 *.jsonl
 .idea/
 .vscode/
+web/node_modules/
+web/.next/
+web/.data/

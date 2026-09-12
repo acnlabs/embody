@@ -357,3 +357,102 @@ def test_run_control_adopts_default_checkout(tmp_path: Path, monkeypatch: pytest
     monkeypatch.setattr(adapter_microduck, "_default_rl_root", lambda: checkout)
     adapter_microduck.run_control("status", dry_run=True)
     assert os.environ["MICRODUCK_RL_ROOT"] == str(checkout)
+
+
+def test_owner_studio_observes(home: Path) -> None:
+    from embody.show import owner_payload
+    from embody.studio import serve
+
+    add_sim("duck-1")
+    bind_offline()
+    run(["policy", "attach", "--hub", "neil-jo/microduck-walk", "--as", "walk"])
+    payload = owner_payload()
+    assert payload["audience"] == "owner"
+    assert payload["show"][0]["origin"] == "sim"
+    assert payload["show"][0]["cards"][0]["alias"] == "walk"
+    assert payload["show"][0]["numbers"] is None
+
+    assert main(["studio", "--bind", "0.0.0.0"]) == 1
+    httpd = serve("127.0.0.1", 0)
+    host, port = httpd.server_address[:2]
+    thread = __import__("threading").Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    try:
+        import urllib.error
+        import urllib.request
+
+        page = urllib.request.urlopen(f"http://{host}:{port}/", timeout=2).read().decode()
+        assert "不是产品" in page
+        assert "owner studio" in page
+        shown = json.loads(
+            urllib.request.urlopen(f"http://{host}:{port}/api/show", timeout=2).read().decode()
+        )
+        assert shown["audience"] == "owner"
+        assert shown["show"][0]["name"] == "duck-1"
+        req = urllib.request.Request(f"http://{host}:{port}/api/show", method="POST")
+        try:
+            urllib.request.urlopen(req, timeout=2)
+            raise AssertionError("POST should be refused")
+        except urllib.error.HTTPError as exc:
+            assert exc.code == 405
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+
+
+def test_push_requires_studio_url_and_bind(home: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    add_sim("duck-1")
+    assert main(["push", "--body", "duck-1"]) == 1
+    bind_offline()
+    monkeypatch.delenv("EMBODY_STUDIO_URL", raising=False)
+    assert main(["push", "--body", "duck-1"]) == 1
+
+
+def test_push_posts_to_embody_web_not_agentplanet(
+    home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    import threading
+
+    add_sim("duck-1")
+    bind_offline()
+    run(["policy", "attach", "--hub", "neil-jo/microduck-walk", "--as", "walk"])
+
+    received: dict = {}
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_POST(self) -> None:
+            length = int(self.headers.get("Content-Length", "0"))
+            received["path"] = self.path
+            received["auth"] = self.headers.get("Authorization")
+            received["body"] = json.loads(self.rfile.read(length).decode())
+            raw = json.dumps({"ok": True, "room": "/b/duck-1"}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(raw)))
+            self.end_headers()
+            self.wfile.write(raw)
+
+        def log_message(self, *_args: object) -> None:
+            return
+
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    try:
+        _host, port = httpd.server_address[:2]
+        monkeypatch.setenv("EMBODY_STUDIO_URL", f"http://127.0.0.1:{port}")
+        monkeypatch.setenv("ACN_API_KEY", "acn_test")
+        capsys.readouterr()
+        assert main(["push", "--body", "duck-1"]) == 0
+        out = json.loads(capsys.readouterr().out)
+        assert out["pushed"] is True
+        assert out["room"] == "/b/duck-1"
+        assert received["path"] == "/api/agent/show"
+        assert received["auth"] == "Bearer acn_test"
+        assert received["body"]["show"]["name"] == "duck-1"
+        assert received["body"]["show"]["origin"] == "sim"
+        assert "agentplanet" not in received["path"]
+    finally:
+        httpd.shutdown()
+        httpd.server_close()

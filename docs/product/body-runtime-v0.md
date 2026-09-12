@@ -9,7 +9,7 @@ Embody does not know how a robot walks. It knows how a **body** is used: identit
 ## Layers
 
 ```text
-studio / CLI
+CLI (this machine) / hosted owner studio (observe only)
   → body runtime (this document)
        → kind runtime (microduck-skill first)
             → vendor sim / firmware

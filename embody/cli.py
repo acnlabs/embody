@@ -21,7 +21,9 @@ from embody.models import (
     utc_now,
     validate_origin,
 )
-from embody.show import body_card, show_for
+from embody.push import PushError, post_show, push_document
+from embody.show import body_card, live_show, show_for
+from embody.studio import DEFAULT_BIND, DEFAULT_PORT, serve as serve_studio
 from embody.store import load, save
 
 
@@ -390,21 +392,25 @@ def cmd_show(args: argparse.Namespace) -> int:
     state = load()
     if args.body or len(state.bodies) == 1:
         body = _resolve_body(state, args.body, need_bound=False)
-        adapter = None
-        numbers_error = None
-        if body.session is not None:
-            try:
-                adapter = run_adapter(body, "status", dry_run=bool(args.dry_run))
-            except AdapterError as exc:
-                numbers_error = str(exc)
-        payload: dict[str, Any] = {
-            "ok": True,
-            "show": [show_for(body, adapter=adapter, numbers_error=numbers_error)],
-            "note": "cards + numbers. Reply on ACN yourself. Embody does not store task ids.",
-        }
-        if adapter is not None:
-            payload["adapter"] = adapter
-        return _dump(payload)
+        if args.dry_run:
+            adapter = None
+            if body.session is not None:
+                adapter = run_adapter(body, "status", dry_run=True)
+            return _dump(
+                {
+                    "ok": True,
+                    "show": [show_for(body, adapter=adapter)],
+                    "note": "cards + numbers. Reply on ACN yourself. Embody does not store task ids.",
+                    "adapter": adapter,
+                }
+            )
+        return _dump(
+            {
+                "ok": True,
+                "show": [live_show(body)],
+                "note": "cards + numbers. Reply on ACN yourself. Embody does not store task ids.",
+            }
+        )
     return _dump(
         {
             "ok": True,
@@ -412,6 +418,38 @@ def cmd_show(args: argparse.Namespace) -> int:
             "note": "many bodies; pass --body to lift live numbers. Reply on ACN yourself.",
         }
     )
+
+
+def cmd_push(args: argparse.Namespace) -> int:
+    state = load()
+    body = _resolve_body(state, args.body, need_bound=True)
+    document = push_document(body)
+    if args.dry_run:
+        return _dump({"ok": True, "dry_run": True, **document})
+    try:
+        remote = post_show(document)
+    except PushError as exc:
+        raise CliError(str(exc)) from exc
+    return _dump({"ok": True, "pushed": True, "room": remote.get("room"), "show": document["show"]})
+
+
+def cmd_studio(args: argparse.Namespace) -> int:
+    try:
+        httpd = serve_studio(args.bind, args.port)
+    except ValueError as exc:
+        raise CliError(str(exc)) from exc
+    host, port = httpd.server_address[:2]
+    print(
+        f"debug Show http://{host}:{port}/  "
+        "(not the product; hosted studio is web/. Ctrl+C to stop)"
+    )
+    try:
+        httpd.serve_forever()
+    except KeyboardInterrupt:
+        print()
+    finally:
+        httpd.server_close()
+    return 0
 
 
 def registry_payload(state: State) -> dict[str, Any]:
@@ -550,6 +588,16 @@ def build_parser() -> argparse.ArgumentParser:
     _add_body_flag(shown)
     shown.set_defaults(func=cmd_show)
 
+    pushed = sub.add_parser("push", help="write a Show snapshot to hosted owner studio")
+    pushed.add_argument("--dry-run", action="store_true")
+    _add_body_flag(pushed)
+    pushed.set_defaults(func=cmd_push)
+
+    studio = sub.add_parser("studio", help="debug localhost Show (not the product page)")
+    studio.add_argument("--bind", default=DEFAULT_BIND)
+    studio.add_argument("--port", type=int, default=DEFAULT_PORT)
+    studio.set_defaults(func=cmd_studio)
+
     registry = sub.add_parser("registry", help="print this machine's body ledger")
     registry_sub = registry.add_subparsers(dest="registry_cmd", required=True)
     printed = registry_sub.add_parser("print")
@@ -563,7 +611,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         return int(args.func(args))
-    except (CliError, AcnError, AdapterError, ValueError) as exc:
+    except (CliError, AcnError, AdapterError, PushError, ValueError) as exc:
         print(json.dumps({"ok": False, "error": str(exc)}), file=sys.stderr)
         return 1
 
