@@ -6,13 +6,21 @@ type Ledger = { bodies: Record<string, BodyShow> };
 
 const KV_KEY = "embody:bodies";
 
+function kvCreds(): { url: string; token: string } | null {
+  const url = (process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL)?.trim();
+  const token = (process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN)?.trim();
+  return url && token ? { url, token } : null;
+}
+
 function useKv(): boolean {
-  return Boolean(process.env.KV_REST_API_URL?.trim() && process.env.KV_REST_API_TOKEN?.trim());
+  return kvCreds() !== null;
 }
 
 async function kv() {
-  const mod = await import("@vercel/kv");
-  return mod.kv;
+  const { createClient } = await import("@vercel/kv");
+  const creds = kvCreds();
+  if (!creds) throw new Error("KV creds missing");
+  return createClient(creds);
 }
 
 function ledgerPath(): string {
