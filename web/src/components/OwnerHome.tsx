@@ -49,7 +49,7 @@ function SetupHint() {
     <div className="empty">
       <h3>缺少 Auth0 client</h3>
       <p>
-        和 ComicLaw 同租户；v0 默认用 ComicLaw 的公开 SPA。也可在 <code>web/.env.local</code> 写{" "}
+        和 ComicLaw 同租户，用 Embody 自己的 SPA client。在 <code>web/.env.local</code> 写{" "}
         <code>NEXT_PUBLIC_AUTH0_CLIENT_ID</code>，回调 <code>/auth/callback</code>。
       </p>
     </div>
