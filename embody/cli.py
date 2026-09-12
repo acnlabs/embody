@@ -21,6 +21,7 @@ from embody.models import (
     utc_now,
     validate_origin,
 )
+from embody.join import JoinError, join_body, studio_configured
 from embody.push import PushError, post_show, push_document
 from embody.show import body_card, live_show, show_for
 from embody.studio import DEFAULT_BIND, DEFAULT_PORT, serve as serve_studio
@@ -144,7 +145,7 @@ def cmd_bind(args: argparse.Namespace) -> int:
             "agent": state.agent.to_dict(),
             "body": body.to_dict(),
             "state": str(path),
-            "note": "body ↔ agent. whoami asks ACN to confirm. Join does not create a body.",
+            "note": "body ↔ agent. whoami asks ACN to confirm. ACN join does not create a body.",
         }
     )
 
@@ -165,7 +166,12 @@ def cmd_body_add(args: argparse.Namespace) -> int:
     name = args.name
     if name and any(b.name == name for b in state.bodies):
         raise CliError(f"body name {name!r} already exists")
-    local_id = new_id("body")
+    joined: dict[str, Any] | None = None
+    if studio_configured():
+        joined = join_body(name=name, kind=kind, origin=origin)
+        local_id = str(joined["body"]["id"])
+    else:
+        local_id = new_id("body")
     body = Body(
         id=local_id,
         kind=kind,
@@ -177,17 +183,46 @@ def cmd_body_add(args: argparse.Namespace) -> int:
     )
     state.bodies.append(body)
     path = save(state)
+    if joined:
+        note = (
+            f"joined hosted studio; the registry minted this id. Room: {joined.get('room')}. "
+            f"Bind next: python3 -m embody bind --body {_body_name(body)}"
+        )
+    else:
+        note = (
+            f"created origin={origin} with a local-only id (no EMBODY_STUDIO_URL); "
+            f"it can never push until adopted: python3 -m embody join --body {_body_name(body)}. "
+            f"Bind next: python3 -m embody bind --body {_body_name(body)}"
+        )
     payload = {
         "ok": True,
         "body": body.to_dict(),
         "state": str(path),
-        "note": f"created origin={origin}. Bind next: python3 -m embody bind --body {_body_name(body)}",
+        "note": note,
     }
+    if joined:
+        payload["joined"] = True
+        payload["room"] = joined.get("room")
     if body.adapter == "none":
         payload["note"] += (
             f" kind={kind!r} has no runtime yet; session waits until one exists."
         )
     return _dump(payload)
+
+
+def cmd_join(args: argparse.Namespace) -> int:
+    state = load()
+    body = _resolve_body(state, args.body, need_bound=False)
+    remote = join_body(name=body.name, kind=body.kind, origin=body.origin, local_id=body.id)
+    return _dump(
+        {
+            "ok": True,
+            "joined": True,
+            "body": body.to_dict(),
+            "room": remote.get("room"),
+            "note": "hosted studio adopted the existing local id. push now works for this body.",
+        }
+    )
 
 
 def cmd_body_list(_args: argparse.Namespace) -> int:
@@ -588,6 +623,10 @@ def build_parser() -> argparse.ArgumentParser:
     _add_body_flag(shown)
     shown.set_defaults(func=cmd_show)
 
+    joined = sub.add_parser("join", help="adopt a local-only body into the hosted registry")
+    _add_body_flag(joined)
+    joined.set_defaults(func=cmd_join)
+
     pushed = sub.add_parser("push", help="write a Show snapshot to hosted owner studio")
     pushed.add_argument("--dry-run", action="store_true")
     _add_body_flag(pushed)
@@ -611,7 +650,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         return int(args.func(args))
-    except (CliError, AcnError, AdapterError, PushError, ValueError) as exc:
+    except (CliError, AcnError, AdapterError, JoinError, PushError, ValueError) as exc:
         print(json.dumps({"ok": False, "error": str(exc)}), file=sys.stderr)
         return 1
 

@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires a joined ACN agent (ACN_API_KEY from POST /agents/join). First body kind needs microduck-plugin / microduck-skill. Optional: EMBODY_HOME, EMBODY_MICRODUCK_SKILL, ACN_BASE_URL, EMBODY_STUDIO_URL."
 metadata:
   author: acnlabs
-  version: "0.1.8"
+  version: "0.1.9"
   homepage: "https://github.com/acnlabs/embody"
   repository: "https://github.com/acnlabs/embody"
   product: embody
@@ -21,12 +21,18 @@ Do not start with `whoami`. `whoami` is this body asking ACN who it is bound to,
 
 ## 1. Create a body (say where it came from)
 
-Agent already `POST /agents/join`. Export `ACN_API_KEY` (and `ACN_BASE_URL` if not the default). Join does not create a body. This machine may already have them in `~/.acn/config.json` (`api_key`, `base_url`) — read that file yourself; Embody does not load it.
+Agent already `POST /agents/join`. Export `ACN_API_KEY` (and `ACN_BASE_URL` if not the default). ACN join does not create a body. This machine may already have them in `~/.acn/config.json` (`api_key`, `base_url`) — read that file yourself; Embody does not load it.
 
 v0 create is localhost sim. `--origin robot` (acquire a real unit) is out of this probe.
 
 ```bash
 python3 -m embody body add --kind microduck --origin sim --name duck-1
+```
+
+With `EMBODY_STUDIO_URL` set, `body add` first **joins the hosted studio**: the registry mints the body id (`body_…`) and records the joining agent, then the CLI instantiates that id locally. Without the URL the id is local-only and can never `push` until adopted:
+
+```bash
+python3 -m embody join --body duck-1
 ```
 
 `kind` is a machine type. `origin` is birth: `sim` or `robot`. Same kind, not two bodies. Only `microduck` has a runtime today ([microduck-plugin](https://github.com/acnlabs/microduck-plugin)). Point at it with `EMBODY_MICRODUCK_SKILL` or a sibling clone. Do not export runtime-private paths such as `MICRODUCK_RL_ROOT`.
@@ -80,7 +86,7 @@ python3 -m embody session status
 
 `show.cards` is Hub preview + onnx. `show.origin` is birth. `show.numbers` is whatever the kind runtime printed. If the sim is down, `show` still prints cards and puts the error in `numbers_error`. Say the numbers. Do not invent `fallen`. Do not POST them to ACN through Embody — you write the ACN message yourself.
 
-To let the owner see this body on the hosted studio, set `EMBODY_STUDIO_URL` and push. That POST is Embody web, not AgentPlanet, not ACN.
+To let the owner see this body on the hosted studio, set `EMBODY_STUDIO_URL` and push. That POST is Embody web, not AgentPlanet, not ACN. Push only updates a **joined** body — an unknown id is refused (`404`); join first.
 
 ```bash
 python3 -m embody push --body duck-1

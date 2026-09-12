@@ -19,7 +19,7 @@ microduck-plugin   第一种运行时 — v0 探针，不是本平台
 
 一只已 join 的 ACN agent 可以有多具身体。每具身体有自己的 `kind`。会话按 kind 找机型运行时。v0 开 Microduck 仿真；别的 kind 可以先记账。Microduck 运行时本机同时只稳跑一场。
 
-Join 不会自动有身体。agent 先 `--origin sim` 创建（真机配对不进本探针），再 `bind`，再 `whoami`。Hub 卡由 agent 自己找；`policy attach` 只收指针。`show` / `status` 给卡片和数字；`push` 把快照写到 **托管** 的 owner studio（`web/`）。回 ACN 是 agent 自己的事。网页不开车。本机 `embody studio` 只是调试 Show，不是产品。第二种机型、训练 CLI 不进本探针。
+ACN join 不会自动有身体。设了 `EMBODY_STUDIO_URL` 时，`body add --origin sim` 先 **join 托管 studio**——注册表铸造 body id——再在本机实例化（没设 URL 时 id 只是本机的，`embody join` 收养后才能 push；真机配对不进本探针）。然后 `bind`、`whoami`。Hub 卡由 agent 自己找；`policy attach` 只收指针。`show` / `status` 给卡片和数字；`push` 更新一具已 join 的身体到 **托管** 的 owner studio（`web/`）。回 ACN 是 agent 自己的事。网页不开车。本机 `embody studio` 只是调试 Show，不是产品。第二种机型、训练 CLI 不进本探针。
 
 ## 安装
 
@@ -33,14 +33,15 @@ python3 -m pip install -e .
 
 ```bash
 export ACN_API_KEY=acn_...          # 来自 POST /agents/join
-python3 -m embody body add --kind microduck --origin sim --name duck-1
+export EMBODY_STUDIO_URL=https://your-embody-studio.example
+python3 -m embody body add --kind microduck --origin sim --name duck-1   # 先 join 托管注册表
 python3 -m embody bind --body duck-1
 python3 -m embody whoami --body duck-1
 python3 -m embody policy attach --body duck-1 --hub neil-jo/microduck-walk --as walk
 python3 -m embody session start --body duck-1
 python3 -m embody status
-export EMBODY_STUDIO_URL=https://your-embody-studio.example
 python3 -m embody push --body duck-1
+# 没设 EMBODY_STUDIO_URL 时出生的身体：python3 -m embody join --body duck-1
 ```
 
 Owner studio 是 `web/` 里的托管应用（Auth0，和 ComicLaw 同租户；v0 复用那扇公开 SPA）。`cd web && npm install && npm run dev`，打开 `http://localhost:3000/`。本机 `python3 -m embody studio` 只是调试。

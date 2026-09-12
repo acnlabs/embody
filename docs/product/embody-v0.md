@@ -30,7 +30,8 @@ ACN  ←→  agent  ←→  body on this machine (Embody)
 
 ```text
 agent arrives
-  → create (sim) or acquire (robot) a body — origin is written on the body
+  → join Embody: the hosted studio mints the body id — origin is written on the body
+    (no studio URL → the CLI mints a local-only id that can never push)
   → bind that body to the agent
   → that body whoami: asks ACN who it is bound to
   → attach cards, drive, read numbers; agent replies on ACN
@@ -48,8 +49,8 @@ AgentPlanet          launch / Credits / embed / Store
                      owner login may read my-agents (who owns which agent)
 embody CLI           workplace on this machine
                      acquire / bind / train / manage / control
-embody web           hosted owner studio (Auth0, same tenant as ComicLaw)
-                     observe rooms. Agent push writes snapshots here.
+embody web           hosted owner studio + body registry (Auth0, same tenant as ComicLaw)
+                     mints body ids on join. Agent push writes snapshots here.
 kind runtime         how this machine type trains and moves
                      first: microduck-skill — not the platform
 Hub                  weights. Agent finds the card. attach stores a pointer.
@@ -66,6 +67,8 @@ ACN agent (protagonist)
 ```
 
 The hosted page is the product surface for the **agent's owner**. It is not a localhost HTTP. Local `embody studio` is a debug Show only. Login is Auth0 on the same tenant as ComicLaw / AgentPlanet (`audience=https://api.agentplanet.org`). v0 reuses ComicLaw's public SPA client and `/auth/callback` so the owner uses the same door. Owner identity may read AgentPlanet `my-agents`. Body snapshots stay on Embody web.
+
+The hosted studio is also the **body registry**: like an agent joins ACN for an `agent_id`, a body joins Embody for its `body_{id}`. `POST /api/agent/bodies` (ACN key) mints the id and records `bound_agent_id` as the joining agent. A body that joined but never pushed still shows in the owner's list — registered, no snapshot yet. `push` only updates joined bodies; an unknown id is refused. Bodies born before the registry are adopted by `embody join --body …`, which registers the existing local id instead of minting a new one.
 
 - Not part of the AgentPlanet monorepo.
 - Not merged with [microduck-plugin](https://github.com/acnlabs/microduck-plugin).
@@ -91,7 +94,7 @@ Join does not create or attach a body. The agent creates or acquires one first; 
 | Body | `embody:body:{id}` | `body` | A machine-type slot (`kind` + `origin`). Sim and robot are birth origin, not two kinds. |
 | Policy | `embody:policy:{id}` | `policy` | Pointer at a Hub graph (`policy.onnx`). One trick, one graph. |
 
-These rows live in `$EMBODY_HOME` (default `~/.embody/state.json`) on the machine that drives. That file is the workplace ledger. It is not an ACN profile and not an AgentPlanet registry. The hosted studio keeps **observation snapshots** the agent `push`es; that copy is Embody's own, not AgentPlanet.
+These rows live in `$EMBODY_HOME` (default `~/.embody/state.json`) on the machine that drives. That file is the workplace ledger. It is not an ACN profile and not an AgentPlanet registry. The hosted studio keeps the **body registry** (joined ids) plus **observation snapshots** the agent `push`es; that copy is Embody's own, not AgentPlanet.
 
 Policy preview: `https://huggingface.co/{repo}/resolve/main/preview.mp4`. A raw `/resolve/main/` click downloads; play the clip on the model card. The agent finds the Hub repo; Embody does not search.
 
@@ -132,7 +135,7 @@ Out of this probe: Jobs training CLI, real-robot pair, Credits, a second body ki
 | ACN | Identity, tasks, collaboration with the **agent**. Optional later: a public nameplate. | Session verbs. Joint commands. Own the workplace ledger. Talk to the body. |
 | AgentPlanet | Launch / Credits / embed / Store. Owner identity: `my-agents`. | Body title. Body remote. Charge `source=embody`. Receive body POSTs. |
 | embody CLI | Create / bind / drive on this machine. `push` a Show snapshot to Embody web. | Call ACN about tasks. Store task ids. Search Hub. Bind the laptop instead of the body. POST the AgentPlanet registry. |
-| embody web | Hosted owner rooms. Auth0 (same tenant as ComicLaw). Accept agent `push`. | Session verbs. Hub search. Credits. Interfaze (until embed_hosts). Localhost-as-product. |
+| embody web | Hosted owner rooms. Mint body ids (`join`). Auth0 (same tenant as ComicLaw). Accept agent `push`. | Session verbs. Hub search. Credits. Interfaze (until embed_hosts). Localhost-as-product. |
 | kind runtime | Train and move this machine type. | Become the platform. Rank Hub cards for the workplace. |
 
 `registry print` dumps the **local** ledger. It does not POST. `push` writes to **Embody web**, not AgentPlanet.

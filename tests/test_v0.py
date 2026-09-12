@@ -18,6 +18,7 @@ from embody.store import load, save, state_path
 def home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setenv("EMBODY_HOME", str(tmp_path))
     monkeypatch.delenv("ACN_API_KEY", raising=False)
+    monkeypatch.delenv("EMBODY_STUDIO_URL", raising=False)
     return tmp_path
 
 
@@ -408,51 +409,151 @@ def test_push_requires_studio_url_and_bind(home: Path, monkeypatch: pytest.Monke
     assert main(["push", "--body", "duck-1"]) == 1
 
 
+class RegistryStub:
+    """Fake hosted studio: a registry-aware join + push endpoint."""
+
+    def __init__(self) -> None:
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+        import threading
+
+        stub = self
+        stub.registered = set()
+        stub.requests: list[dict] = []
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self) -> None:
+                length = int(self.headers.get("Content-Length", "0"))
+                body = json.loads(self.rfile.read(length).decode())
+                stub.requests.append(
+                    {"path": self.path, "auth": self.headers.get("Authorization"), "body": body}
+                )
+                if self.path == "/api/agent/bodies":
+                    wanted = body.get("id") or "body_aaaa11112222"
+                    if wanted in stub.registered:
+                        status, payload = 409, {"ok": False, "error": "taken"}
+                    else:
+                        stub.registered.add(wanted)
+                        status, payload = 200, {
+                            "ok": True,
+                            "body": {"id": wanted},
+                            "room": f"/b/{wanted}",
+                        }
+                elif self.path == "/api/agent/show":
+                    show = (body or {}).get("show") or {}
+                    if show.get("id") not in stub.registered:
+                        status, payload = 404, {"ok": False, "error": "join first"}
+                    else:
+                        status, payload = 200, {"ok": True, "room": f"/b/{show['id']}"}
+                else:
+                    status, payload = 404, {"ok": False}
+                raw = json.dumps(payload).encode()
+                self.send_response(status)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(raw)))
+                self.end_headers()
+                self.wfile.write(raw)
+
+            def log_message(self, *_args: object) -> None:
+                return
+
+        self.httpd = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.thread = threading.Thread(target=self.httpd.serve_forever, daemon=True)
+        self.thread.start()
+
+    @property
+    def url(self) -> str:
+        _host, port = self.httpd.server_address[:2]
+        return f"http://127.0.0.1:{port}"
+
+    def close(self) -> None:
+        self.httpd.shutdown()
+        self.httpd.server_close()
+
+
 def test_push_posts_to_embody_web_not_agentplanet(
     home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-    import threading
-
     add_sim("duck-1")
     bind_offline()
     run(["policy", "attach", "--hub", "neil-jo/microduck-walk", "--as", "walk"])
 
-    received: dict = {}
-
-    class Handler(BaseHTTPRequestHandler):
-        def do_POST(self) -> None:
-            length = int(self.headers.get("Content-Length", "0"))
-            received["path"] = self.path
-            received["auth"] = self.headers.get("Authorization")
-            received["body"] = json.loads(self.rfile.read(length).decode())
-            raw = json.dumps({"ok": True, "room": "/b/duck-1"}).encode()
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(raw)))
-            self.end_headers()
-            self.wfile.write(raw)
-
-        def log_message(self, *_args: object) -> None:
-            return
-
-    httpd = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
-    thread.start()
+    stub = RegistryStub()
     try:
-        _host, port = httpd.server_address[:2]
-        monkeypatch.setenv("EMBODY_STUDIO_URL", f"http://127.0.0.1:{port}")
+        monkeypatch.setenv("EMBODY_STUDIO_URL", stub.url)
         monkeypatch.setenv("ACN_API_KEY", "acn_test")
         capsys.readouterr()
+        assert main(["join", "--body", "duck-1"]) == 0
+        joined = json.loads(capsys.readouterr().out)
+        assert joined["joined"] is True
         assert main(["push", "--body", "duck-1"]) == 0
         out = json.loads(capsys.readouterr().out)
         assert out["pushed"] is True
-        assert out["room"] == "/b/duck-1"
-        assert received["path"] == "/api/agent/show"
-        assert received["auth"] == "Bearer acn_test"
-        assert received["body"]["show"]["name"] == "duck-1"
-        assert received["body"]["show"]["origin"] == "sim"
-        assert "agentplanet" not in received["path"]
+        local_id = load().bodies[0].id
+        assert out["room"] == f"/b/{local_id}"
+        join_req, push_req = stub.requests
+        assert join_req["path"] == "/api/agent/bodies"
+        assert join_req["auth"] == "Bearer acn_test"
+        assert join_req["body"]["id"] == local_id
+        assert push_req["path"] == "/api/agent/show"
+        assert push_req["auth"] == "Bearer acn_test"
+        assert push_req["body"]["show"]["name"] == "duck-1"
+        assert push_req["body"]["show"]["origin"] == "sim"
+        assert "agentplanet" not in push_req["path"]
     finally:
-        httpd.shutdown()
-        httpd.server_close()
+        stub.close()
+
+
+def test_push_refused_before_join(
+    home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    add_sim("duck-1")
+    bind_offline()
+    stub = RegistryStub()
+    try:
+        monkeypatch.setenv("EMBODY_STUDIO_URL", stub.url)
+        monkeypatch.setenv("ACN_API_KEY", "acn_test")
+        capsys.readouterr()
+        assert main(["push", "--body", "duck-1"]) == 1
+        err = json.loads(capsys.readouterr().err)
+        assert "join first" in err["error"]
+        assert stub.requests[0]["path"] == "/api/agent/show"
+    finally:
+        stub.close()
+
+
+def test_body_add_joins_hosted_when_studio_set(
+    home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    stub = RegistryStub()
+    try:
+        monkeypatch.setenv("EMBODY_STUDIO_URL", stub.url)
+        monkeypatch.setenv("ACN_API_KEY", "acn_test")
+        capsys.readouterr()
+        assert main(["body", "add", "--kind", "microduck", "--origin", "sim", "--name", "duck-9"]) == 0
+        out = json.loads(capsys.readouterr().out)
+        assert out["joined"] is True
+        assert out["body"]["id"] == "body_aaaa11112222"
+        assert out["room"] == "/b/body_aaaa11112222"
+        join_req = stub.requests[0]
+        assert join_req["path"] == "/api/agent/bodies"
+        assert join_req["body"] == {"kind": "microduck", "origin": "sim", "name": "duck-9"}
+        assert "id" not in join_req["body"]
+    finally:
+        stub.close()
+
+
+def test_join_conflict_fails(
+    home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    add_sim("duck-1")
+    stub = RegistryStub()
+    try:
+        monkeypatch.setenv("EMBODY_STUDIO_URL", stub.url)
+        monkeypatch.setenv("ACN_API_KEY", "acn_test")
+        capsys.readouterr()
+        assert main(["join", "--body", "duck-1"]) == 0
+        assert main(["join", "--body", "duck-1"]) == 1
+        err = json.loads(capsys.readouterr().err)
+        assert "409" in err["error"]
+    finally:
+        stub.close()

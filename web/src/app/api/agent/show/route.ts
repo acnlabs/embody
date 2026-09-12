@@ -1,5 +1,5 @@
 import { fetchAgentId } from "@/lib/acn";
-import { upsertBody } from "@/lib/ledger";
+import { getBody, upsertBody } from "@/lib/ledger";
 import { extractBearerToken } from "@/lib/userAuth";
 import type { BodyShow, Card } from "@/lib/types";
 
@@ -69,6 +69,12 @@ export async function POST(req: Request) {
   }
   if (show.bound_agent_id !== agentId) {
     return Response.json({ ok: false, error: "bound_agent_id does not match this ACN key" }, { status: 403 });
+  }
+  if (!(await getBody(show.id))) {
+    return Response.json(
+      { ok: false, error: "unknown body id — join first: POST /api/agent/bodies" },
+      { status: 404 },
+    );
   }
   const stored = await upsertBody(show);
   return Response.json({

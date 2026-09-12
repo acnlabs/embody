@@ -47,8 +47,28 @@ async function readLedger(): Promise<Ledger> {
   return { bodies };
 }
 
+/** Registry write: a body joins and gets its id recorded. null = id already taken. */
+export async function registerBody(row: BodyShow): Promise<BodyShow | null> {
+  const ledger = await readLedger();
+  if (ledger.bodies[row.id]) return null;
+  const stored: BodyShow = { ...row, joined_at: new Date().toISOString() };
+  if (useKv()) {
+    const client = await kv();
+    await client.hset(KV_KEY, { [stored.id]: stored });
+    return stored;
+  }
+  ledger.bodies[stored.id] = stored;
+  writeFile(ledger);
+  return stored;
+}
+
 export async function upsertBody(show: BodyShow): Promise<BodyShow> {
-  const stored: BodyShow = { ...show, pushed_at: new Date().toISOString() };
+  const existing = (await readLedger()).bodies[show.id];
+  const stored: BodyShow = {
+    ...show,
+    joined_at: existing?.joined_at,
+    pushed_at: new Date().toISOString(),
+  };
   if (useKv()) {
     const client = await kv();
     await client.hset(KV_KEY, { [stored.id]: stored });

@@ -19,5 +19,6 @@ export type BodyShow = {
   numbers_error?: string;
   next?: string;
   note?: string;
+  joined_at?: string;
   pushed_at?: string;
 };
