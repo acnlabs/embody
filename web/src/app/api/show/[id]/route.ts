@@ -13,7 +13,7 @@ export async function GET(
     return Response.json({ ok: false, error: "owner Auth0 token required" }, { status: 401 });
   }
   const { id } = await ctx.params;
-  const body = getBody(id);
+  const body = await getBody(id);
   if (!body) {
     return Response.json({ ok: false, error: "body not pushed" }, { status: 404 });
   }

@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "@auth0/auth0-react": "^2.21.0",
+    "@vercel/kv": "^3.0.0",
     "jose": "^6.2.3",
     "next": "16.2.10",
     "react": "19.2.4",

@@ -14,13 +14,14 @@ export async function GET(req: Request) {
   if (mine == null) {
     return Response.json({ ok: false, error: "could not read my-agents" }, { status: 502 });
   }
+  const show = await listBodiesForAgents(mine.map((row) => row.id));
   return Response.json({
     ok: true,
     audience: "owner",
     workplace: "studio",
     owner: sub,
     agents: mine,
-    show: listBodiesForAgents(mine.map((row) => row.id)),
+    show,
     note: "Owner observation. The agent drives. Embody does not store task ids.",
   });
 }

@@ -70,7 +70,7 @@ export async function POST(req: Request) {
   if (show.bound_agent_id !== agentId) {
     return Response.json({ ok: false, error: "bound_agent_id does not match this ACN key" }, { status: 403 });
   }
-  const stored = upsertBody(show);
+  const stored = await upsertBody(show);
   return Response.json({
     ok: true,
     room: `/b/${stored.id}`,
