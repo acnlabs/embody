@@ -111,6 +111,7 @@ class Body:
     origin: str = ORIGIN_SIM
     bound_agent_id: str | None = None
     name: str | None = None
+    build: dict[str, Any] = field(default_factory=dict)
     policies: list[Policy] = field(default_factory=list)
     session: Session | None = None
 
@@ -124,6 +125,7 @@ class Body:
             "asset_ref": self.asset_ref,
             "adapter": self.adapter,
             "registered_at": self.registered_at,
+            "build": self.build,
             "policies": [p.to_dict() for p in self.policies],
             "session": None if self.session is None else self.session.to_dict(),
         }
@@ -133,6 +135,7 @@ class Body:
         policies = [Policy.from_dict(p) for p in data.get("policies") or []]
         session = data.get("session")
         bound = data["bound_agent_id"] if "bound_agent_id" in data else None
+        build = data.get("build")
         return cls(
             id=str(data["id"]),
             kind=str(data["kind"]),
@@ -142,6 +145,7 @@ class Body:
             origin=str(data.get("origin") or ORIGIN_SIM),
             bound_agent_id=str(bound) if bound else None,
             name=data.get("name"),
+            build=dict(build) if isinstance(build, dict) else {},
             policies=policies,
             session=None if session is None else Session.from_dict(session),
         )

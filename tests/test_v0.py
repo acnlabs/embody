@@ -557,3 +557,84 @@ def test_join_conflict_fails(
         assert "409" in err["error"]
     finally:
         stub.close()
+
+
+def test_body_add_gets_kind_default_build(home: Path) -> None:
+    add_sim("duck-1")
+    body = load().bodies[0]
+    assert body.build["bom"] == "microduck-sim"
+    assert body.build["modules"]["imu"] is True
+    assert body.build["modules"]["camera"] is False
+
+
+def test_body_add_build_overlay_merges_modules(home: Path) -> None:
+    argv = [
+        "body", "add", "--kind", "microduck", "--origin", "sim", "--name", "duck-cam",
+        "--build", '{"bom": "microduck-sim-cam", "modules": {"camera": true}}',
+    ]
+    assert main(argv) == 0
+    modules = load().bodies[0].build["modules"]
+    assert load().bodies[0].build["bom"] == "microduck-sim-cam"
+    assert modules["camera"] is True
+    assert modules["imu"] is True
+
+
+def test_body_add_build_rejects_non_object(home: Path) -> None:
+    assert main(["body", "add", "--origin", "sim", "--build", "[1, 2]"]) == 1
+    assert main(["body", "add", "--origin", "sim", "--build", "{nope"]) == 1
+    assert load().bodies == []
+
+
+def test_body_build_set_unset_replace(home: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    add_sim("duck-1")
+    capsys.readouterr()
+    assert main(["body", "build", "--body", "duck-1"]) == 0
+    shown = json.loads(capsys.readouterr().out)
+    assert shown["changed"] is False
+    assert shown["build"]["bom"] == "microduck-sim"
+
+    argv = ["body", "build", "--body", "duck-1",
+            "--set", "modules.camera=true", "--set", "serial=MD-0001"]
+    assert main(argv) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out["changed"] is True
+    assert out["build"]["modules"]["camera"] is True
+    assert out["build"]["serial"] == "MD-0001"
+
+    assert main(["body", "build", "--body", "duck-1", "--unset", "modules.camera"]) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert "camera" not in out["build"]["modules"]
+    assert out["build"]["modules"]["imu"] is True
+
+    assert main(["body", "build", "--body", "duck-1", "--replace", '{"bom": "bare"}']) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out["build"] == {"bom": "bare"}
+
+    assert main(["body", "build", "--body", "duck-1", "--set", "bad-item"]) == 1
+
+
+def test_push_carries_build(
+    home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    add_sim("duck-1")
+    bind_offline()
+    run(["body", "build", "--body", "duck-1", "--set", "modules.camera=true"])
+    stub = RegistryStub()
+    try:
+        monkeypatch.setenv("EMBODY_STUDIO_URL", stub.url)
+        monkeypatch.setenv("ACN_API_KEY", "acn_test")
+        capsys.readouterr()
+        assert main(["join", "--body", "duck-1"]) == 0
+        assert main(["push", "--body", "duck-1"]) == 0
+        capsys.readouterr()
+        push_req = stub.requests[-1]
+        build = push_req["body"]["show"]["build"]
+        assert build["modules"]["camera"] is True
+        assert build["modules"]["imu"] is True
+    finally:
+        stub.close()
+
+
+def test_unknown_kind_has_empty_default_build(home: Path) -> None:
+    assert main(["body", "add", "--kind", "unitree-g1", "--origin", "sim"]) == 0
+    assert load().bodies[0].build == {}

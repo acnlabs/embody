@@ -37,6 +37,16 @@ python3 -m embody join --body duck-1
 
 `kind` is a machine type. `origin` is birth: `sim` or `robot`. Same kind, not two bodies. Only `microduck` has a runtime today ([microduck-plugin](https://github.com/acnlabs/microduck-plugin)). Point at it with `EMBODY_MICRODUCK_SKILL` or a sibling clone. Do not export runtime-private paths such as `MICRODUCK_RL_ROOT`.
 
+A body also has a `build`: the as-built manifest of this one unit (BOM revision, `modules` like `camera` / `imu`, serial, calibration). Sim bodies are born with the kind's default build; robot units record theirs at pairing. Two same-kind bodies can differ in build. Pass `--build '{"modules": {"camera": true}}'` at `body add` (merged over the kind default), or edit later:
+
+```bash
+python3 -m embody body build --body duck-1                          # show
+python3 -m embody body build --body duck-1 --set modules.camera=true --set serial=MD-0001
+python3 -m embody body build --body duck-1 --unset modules.camera
+```
+
+`push` carries the build; the hosted room renders it as 配置.
+
 ## 2. Bind, then this body asks ACN
 
 ```bash

@@ -36,6 +36,10 @@ function asShow(raw: unknown): BodyShow | null {
     origin,
     bound_agent_id: bound,
     session_running: Boolean(row.session_running),
+    build:
+      row.build && typeof row.build === "object" && !Array.isArray(row.build)
+        ? (row.build as Record<string, unknown>)
+        : undefined,
     cards,
     numbers:
       row.numbers && typeof row.numbers === "object"

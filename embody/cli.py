@@ -6,7 +6,14 @@ import sys
 from typing import Any
 
 from embody.acn import AcnError, acn_base_url, api_key, fetch_me
-from embody.adapters import AdapterError, adapter_id_for, guard_concurrency, run as run_adapter, validate_kind
+from embody.adapters import (
+    AdapterError,
+    adapter_id_for,
+    default_build_for,
+    guard_concurrency,
+    run as run_adapter,
+    validate_kind,
+)
 from embody.models import (
     ORIGIN_ROBOT,
     ORIGIN_SIM,
@@ -157,6 +164,59 @@ def cmd_claim(_args: argparse.Namespace) -> int:
     )
 
 
+def _parse_build_json(raw: str) -> dict[str, Any]:
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise CliError(f"--build / --replace takes a JSON object: {exc}") from exc
+    if not isinstance(parsed, dict):
+        raise CliError("build must be a JSON object, e.g. '{\"modules\": {\"camera\": true}}'")
+    return parsed
+
+
+def _merge_build(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:
+    out = dict(base)
+    for key, value in overlay.items():
+        if isinstance(value, dict) and isinstance(out.get(key), dict):
+            out[key] = _merge_build(out[key], value)
+        else:
+            out[key] = value
+    return out
+
+
+def _set_dot_path(build: dict[str, Any], path: str, value: Any) -> None:
+    keys = [k for k in path.split(".") if k]
+    if not keys:
+        raise CliError("--set needs a key, e.g. --set modules.camera=true")
+    node = build
+    for key in keys[:-1]:
+        nxt = node.get(key)
+        if not isinstance(nxt, dict):
+            nxt = {}
+            node[key] = nxt
+        node = nxt
+    node[keys[-1]] = value
+
+
+def _unset_dot_path(build: dict[str, Any], path: str) -> None:
+    keys = [k for k in path.split(".") if k]
+    node = build
+    for key in keys[:-1]:
+        nxt = node.get(key)
+        if not isinstance(nxt, dict):
+            return
+        node = nxt
+    if keys:
+        node.pop(keys[-1], None)
+
+
+def _parse_set_value(raw: str) -> Any:
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return raw
+
+
 def cmd_body_add(args: argparse.Namespace) -> int:
     kind = validate_kind(args.kind)
     origin = validate_origin(args.origin)
@@ -166,6 +226,9 @@ def cmd_body_add(args: argparse.Namespace) -> int:
     name = args.name
     if name and any(b.name == name for b in state.bodies):
         raise CliError(f"body name {name!r} already exists")
+    build = default_build_for(kind)
+    if args.build:
+        build = _merge_build(build, _parse_build_json(args.build))
     joined: dict[str, Any] | None = None
     if studio_configured():
         joined = join_body(name=name, kind=kind, origin=origin)
@@ -180,6 +243,7 @@ def cmd_body_add(args: argparse.Namespace) -> int:
         adapter=adapter_id_for(kind),
         registered_at=utc_now(),
         name=name,
+        build=build,
     )
     state.bodies.append(body)
     path = save(state)
@@ -237,6 +301,35 @@ def cmd_body_list(_args: argparse.Namespace) -> int:
                 }
                 for b in state.bodies
             ],
+        }
+    )
+
+
+def cmd_body_build(args: argparse.Namespace) -> int:
+    state = load()
+    body = _resolve_body(state, args.body, need_bound=False)
+    changed = False
+    if args.replace is not None:
+        body.build = _parse_build_json(args.replace)
+        changed = True
+    for item in args.set or []:
+        if "=" not in item:
+            raise CliError(f"--set takes key=value, not {item!r}")
+        key, raw = item.split("=", 1)
+        _set_dot_path(body.build, key.strip(), _parse_set_value(raw.strip()))
+        changed = True
+    for key in args.unset or []:
+        _unset_dot_path(body.build, key.strip())
+        changed = True
+    if changed:
+        save(state)
+    return _dump(
+        {
+            "ok": True,
+            "body": _body_name(body),
+            "build": body.build,
+            "changed": changed,
+            "note": "as-built manifest of this one unit. push to show it in the hosted room.",
         }
     )
 
@@ -567,9 +660,16 @@ def build_parser() -> argparse.ArgumentParser:
     add.add_argument("--kind", default="microduck")
     add.add_argument("--origin", required=True, help="sim (create) or robot (acquire; v0 refuses)")
     add.add_argument("--name")
+    add.add_argument("--build", help="JSON as-built manifest, merged over the kind default")
     add.set_defaults(func=cmd_body_add)
     listed = body_sub.add_parser("list")
     listed.set_defaults(func=cmd_body_list)
+    buildc = body_sub.add_parser("build", help="show / edit this unit's as-built manifest")
+    buildc.add_argument("--set", action="append", metavar="KEY=VALUE", help="dot path, JSON value")
+    buildc.add_argument("--unset", action="append", metavar="KEY")
+    buildc.add_argument("--replace", help="JSON object; replaces the whole manifest")
+    _add_body_flag(buildc)
+    buildc.set_defaults(func=cmd_body_build)
 
     policy = sub.add_parser("policy", help="attach a Hub policy the agent already chose")
     policy_sub = policy.add_subparsers(dest="policy_cmd", required=True)

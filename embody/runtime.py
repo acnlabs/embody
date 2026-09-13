@@ -12,6 +12,9 @@ class BodyRuntimeError(RuntimeError):
 class BodyRuntime(Protocol):
     kind: str
     adapter_id: str
+    # As-built manifest a sim body of this kind is born with. Robot units record
+    # their own at pairing instead.
+    default_build: dict[str, Any]
 
     def guard_start(self, state: State, body: Body) -> None: ...
 

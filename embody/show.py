@@ -82,6 +82,7 @@ def body_card(body: Body) -> dict[str, Any]:
         "origin": body.origin,
         "bound_agent_id": body.bound_agent_id,
         "asset_ref": body.asset_ref,
+        "build": body.build,
         "session_running": body.session is not None,
         "session": None if body.session is None else body.session.to_dict(),
         "next": next_hint(body),

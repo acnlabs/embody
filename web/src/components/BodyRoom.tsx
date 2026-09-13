@@ -95,6 +95,51 @@ function Telemetry({ body }: { body: BodyShow }) {
   );
 }
 
+function buildVal(v: unknown): string {
+  if (typeof v === "boolean") return v ? "有" : "无";
+  if (v == null) return "—";
+  if (typeof v === "object") return JSON.stringify(v);
+  return String(v);
+}
+
+function BuildSection({ build }: { build: Record<string, unknown> }) {
+  const modules =
+    build.modules && typeof build.modules === "object" && !Array.isArray(build.modules)
+      ? (build.modules as Record<string, unknown>)
+      : {};
+  const extras = Object.entries(build).filter(([k]) => k !== "modules");
+  const moduleEntries = Object.entries(modules);
+  return (
+    <>
+      <h3 className="cards-head">配置 · 这台身体的装配</h3>
+      <div className="build-panel">
+        {extras.map(([key, value]) => (
+          <div className="build-row" key={key}>
+            <span className="build-key">{key}</span>
+            <span className="build-val">{buildVal(value)}</span>
+          </div>
+        ))}
+        {moduleEntries.length ? (
+          <div className="build-row">
+            <span className="build-key">modules</span>
+            <span className="module-list">
+              {moduleEntries.map(([name, value]) => (
+                <span
+                  key={name}
+                  className={`badge module${value === false || value == null ? " off" : ""}`}
+                >
+                  {name}
+                  {typeof value === "boolean" ? (value ? "" : " 无") : `: ${buildVal(value)}`}
+                </span>
+              ))}
+            </span>
+          </div>
+        ) : null}
+      </div>
+    </>
+  );
+}
+
 function MainStage({ body }: { body: BodyShow }) {
   return (
     <div className="preview">
@@ -161,6 +206,8 @@ export function RoomView({ body }: { body: BodyShow }) {
         <MainStage body={body} />
         <Telemetry body={body} />
       </div>
+
+      {body.build && Object.keys(body.build).length ? <BuildSection build={body.build} /> : null}
 
       <h3 className="cards-head">招式卡 · {cards.length}</h3>
       {cards.length ? (

@@ -70,6 +70,12 @@ class MicroduckRuntime:
 
     kind = KIND
     adapter_id = ADAPTER_ID
+    # Sim sensor set, as evidenced by runtime telemetry (tilt + foot contact).
+    # The sim model carries no camera.
+    default_build = {
+        "bom": "microduck-sim",
+        "modules": {"imu": True, "foot_contact": True, "camera": False},
+    }
 
     def guard_start(self, state, body) -> None:
         busy = state.running_by_kind(self.kind, except_id=body.id)

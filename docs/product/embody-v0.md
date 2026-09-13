@@ -87,11 +87,13 @@ A body has a `kind` (machine type). Session verbs dispatch to that kind's **runt
 
 Join does not create or attach a body. The agent creates or acquires one first; `origin` is `sim` or `robot` at birth. Same `kind`, not `microduck-sim` / `microduck-real`. `bind` writes body ↔ agent. `whoami` is that body asking ACN. v0 create is `--origin sim` only. See [body-runtime-v0.md](./body-runtime-v0.md).
 
+`kind` says how the machine drives — the control contract (observation/action shape, runtime). It does not say what one particular unit carries. A body also has a `build`: the as-built manifest of this one unit — BOM revision, modules (`camera`, `imu`, …), serial, calibration. Sim bodies take the kind's default build; robot units record theirs at pairing. Two same-kind bodies can differ in build (one has a camera, one does not). v0 records and shows the build; policy hardware-gating on attach is a later seam, not this probe.
+
 ## Objects
 
 | Object | `asset_ref` | `asset_kind` | Meaning |
 |---|---|---|---|
-| Body | `embody:body:{id}` | `body` | A machine-type slot (`kind` + `origin`). Sim and robot are birth origin, not two kinds. |
+| Body | `embody:body:{id}` | `body` | A machine-type slot (`kind` + `origin`) plus its `build` manifest. Sim and robot are birth origin, not two kinds. |
 | Policy | `embody:policy:{id}` | `policy` | Pointer at a Hub graph (`policy.onnx`). One trick, one graph. |
 
 These rows live in `$EMBODY_HOME` (default `~/.embody/state.json`) on the machine that drives. That file is the workplace ledger. It is not an ACN profile and not an AgentPlanet registry. The hosted studio keeps the **body registry** (joined ids) plus **observation snapshots** the agent `push`es; that copy is Embody's own, not AgentPlanet.

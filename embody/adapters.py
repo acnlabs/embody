@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import re
 from typing import Any
 
@@ -29,6 +30,13 @@ def validate_kind(kind: str) -> str:
 def adapter_id_for(kind: str) -> str:
     runtime = _RUNTIMES.get(kind)
     return runtime.adapter_id if runtime is not None else "none"
+
+
+def default_build_for(kind: str) -> dict[str, Any]:
+    runtime = _RUNTIMES.get(kind)
+    if runtime is None:
+        return {}
+    return copy.deepcopy(runtime.default_build)
 
 
 def get_runtime(kind: str) -> BodyRuntime | None:

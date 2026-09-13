@@ -14,6 +14,7 @@ export type BodyShow = {
   origin: string;
   bound_agent_id: string;
   session_running?: boolean;
+  build?: Record<string, unknown>;
   cards?: Card[];
   numbers?: Record<string, unknown> | null;
   numbers_error?: string;
