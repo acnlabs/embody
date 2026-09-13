@@ -8,6 +8,17 @@ from embody.models import Body, hub_resolve
 from embody.store import load
 
 
+def public_runtime_error(exc: BaseException | str) -> str:
+    """Owner-facing line. Never paste a Python traceback into Show."""
+    text = str(exc).strip()
+    if "Connection refused" in text or "Errno 61" in text:
+        return "localhost sim is not listening (127.0.0.1:8765). session start, then push."
+    if "Traceback" in text:
+        last = next((line.strip() for line in reversed(text.splitlines()) if line.strip()), text)
+        return last[:240]
+    return text[:240]
+
+
 def lift_runtime_numbers(adapter: dict[str, Any]) -> dict[str, Any] | None:
     """Pass through JSON the kind runtime printed. Do not invent a verdict."""
     raw = adapter.get("stdout")
@@ -58,7 +69,7 @@ def live_show(body: Body) -> dict[str, Any]:
         try:
             adapter = run_adapter(body, "status", dry_run=False)
         except AdapterError as exc:
-            numbers_error = str(exc)
+            numbers_error = public_runtime_error(exc)
     return show_for(body, adapter=adapter, numbers_error=numbers_error)
 
 

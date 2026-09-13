@@ -9,8 +9,8 @@ import pytest
 from embody import adapter_microduck
 from embody.adapters import get_runtime
 from embody.cli import main
-from embody.models import State, asset_ref, hub_resolve
-from embody.show import lift_runtime_numbers
+from embody.models import Session, State, asset_ref, hub_resolve
+from embody.show import lift_runtime_numbers, public_runtime_error
 from embody.store import load, save, state_path
 
 
@@ -334,6 +334,35 @@ def test_show_keeps_cards_when_runtime_status_fails(
     assert card["cards"][0]["alias"] == "walk"
     assert card["numbers"] is None
     assert "sim down" in card["numbers_error"]
+    assert "Traceback" not in card["numbers_error"]
+
+
+def test_session_stop_clears_when_sim_gone(
+    home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    skill = _mock_skill(tmp_path, monkeypatch)
+    add_sim("duck-1")
+    bind_offline()
+    run(["policy", "attach", "--hub", "neil-jo/microduck-walk", "--as", "walk"])
+    run(["session", "start", "--dry-run"])
+    (skill / "scripts" / "control.sh").write_text(
+        "#!/bin/sh\necho gone >&2\nexit 1\n", encoding="utf-8"
+    )
+    (skill / "scripts" / "control.sh").chmod(0o755)
+    assert main(["session", "stop"]) == 0
+    assert load().bodies[0].session is None
+
+
+def test_public_runtime_error_hides_traceback() -> None:
+    raw = (
+        "Traceback (most recent call last):\n"
+        "  File \"x.py\", line 1, in <module>\n"
+        "ConnectionRefusedError: [Errno 61] Connection refused\n"
+    )
+    out = public_runtime_error(raw)
+    assert "Traceback" not in out
+    assert "127.0.0.1:8765" in out
+    assert public_runtime_error("sim down") == "sim down"
 
 
 def test_prepare_ok_when_doctor_fails_but_sim_ready(
@@ -674,3 +703,69 @@ def test_body_add_build_rejects_too_large(home: Path) -> None:
     huge = json.dumps({"pad": "x" * 20000})
     assert main(["body", "add", "--origin", "sim", "--build", huge]) == 1
     assert load().bodies == []
+
+
+def _mark_running(name: str = "duck-1") -> None:
+    state = load()
+    body = state.body_by_token(name)
+    assert body is not None
+    body.session = Session(
+        id="session_test",
+        started_at="2026-09-13T00:00:00+00:00",
+        adapter="microduck-skill",
+    )
+    save(state)
+
+
+def test_push_watch_refuses_without_session(home: Path) -> None:
+    add_sim("duck-1")
+    bind_offline()
+    assert main(["push", "--watch", "--body", "duck-1"]) == 1
+    assert main(["push", "--watch", "--body", "duck-1", "--interval", "0"]) == 1
+
+
+def test_push_watch_stops_when_session_ends(
+    home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    add_sim("duck-1")
+    bind_offline()
+    _mark_running()
+
+    def fake_document(body):
+        return {
+            "ok": True,
+            "audience": "owner",
+            "workplace": "studio",
+            "show": {
+                "id": body.id,
+                "name": body.name,
+                "kind": body.kind,
+                "origin": body.origin,
+                "bound_agent_id": body.bound_agent_id,
+                "session_running": body.session is not None,
+            },
+            "note": "test",
+        }
+
+    def fake_sleep(_seconds: float) -> None:
+        state = load()
+        state.bodies[0].session = None
+        save(state)
+
+    monkeypatch.setattr("embody.cli.push_document", fake_document)
+    monkeypatch.setattr("embody.cli.time.sleep", fake_sleep)
+
+    stub = RegistryStub()
+    try:
+        monkeypatch.setenv("EMBODY_STUDIO_URL", stub.url)
+        monkeypatch.setenv("ACN_API_KEY", "acn_test")
+        capsys.readouterr()
+        assert main(["join", "--body", "duck-1"]) == 0
+        capsys.readouterr()
+        assert main(["push", "--watch", "--body", "duck-1", "--interval", "0.01"]) == 0
+        shows = [row for row in stub.requests if row["path"] == "/api/agent/show"]
+        assert len(shows) == 2
+        assert shows[0]["body"]["show"]["session_running"] is True
+        assert shows[1]["body"]["show"]["session_running"] is False
+    finally:
+        stub.close()

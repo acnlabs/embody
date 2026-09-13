@@ -109,7 +109,7 @@ Policy preview: `https://huggingface.co/{repo}/resolve/main/preview.mp4`. A raw 
 | Train | Studio verb; the kind runtime trains (no generic PPO in the kernel) | Runtime only. No `train` in this kernel. |
 | Manage | Many bodies, many cards, venues | `body` / `policy` list, attach |
 | Control | Session on the body's origin | `prepare` / `start` / `pull` / `do` / `status` / `stop` (v0: `origin=sim`) |
-| Show | Card + numbers | CLI `show` / `status`. Agent `push`es a snapshot to hosted owner studio (`web/`). Hub preview + onnx; live `numbers` pass through. No fallen verdict. Agent drives and replies on ACN. Local `embody studio` is debug only. |
+| Show | Card + numbers | CLI `show` / `status`. Agent `push`es a snapshot to hosted owner studio (`web/`). `push --watch` keeps pushing while the session runs; the page polls, it does not drive. Hub preview + onnx; live `numbers` pass through. No fallen verdict. Agent drives and replies on ACN. Local `embody studio` is debug only. |
 
 Datacollect and real-robot lines stay in the kind runtime. Real-robot commands print by default. JSONL does not enter official PPO.
 

@@ -82,6 +82,7 @@ Preview is on the model card. A raw `/resolve/main/preview.mp4` click downloads.
 
 ```bash
 python3 -m embody session start --body duck-1
+python3 -m embody push --watch --body duck-1   # other terminal; room follows the sim
 python3 -m embody session pull --body duck-1 --as polite_bow
 python3 -m embody session do --body duck-1 polite_bow
 python3 -m embody session stop --body duck-1
@@ -98,10 +99,11 @@ python3 -m embody session status
 
 `show.cards` is Hub preview + onnx. `show.origin` is birth. `show.numbers` is whatever the kind runtime printed. If the sim is down, `show` still prints cards and puts the error in `numbers_error`. Say the numbers. Do not invent `fallen`. Do not POST them to ACN through Embody — you write the ACN message yourself.
 
-To let the owner see this body on the hosted studio, set `EMBODY_STUDIO_URL` and push. That POST is Embody web, not AgentPlanet, not ACN. Push only updates a **joined** body — an unknown id is refused (`404`); join first.
+To let the owner see this body on the hosted studio, set `EMBODY_STUDIO_URL` and push. That POST is Embody web, not AgentPlanet, not ACN. Push only updates a **joined** body — an unknown id is refused (`404`); join first. While a session is running, `push --watch` repeats the snapshot until the session ends or you Ctrl+C (that stops watching, not the sim).
 
 ```bash
 python3 -m embody push --body duck-1
+python3 -m embody push --watch --body duck-1
 ```
 
 `status` is the workplace ledger plus the same cards. `registry print` dumps the local ledger only; it does not POST.

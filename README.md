@@ -41,8 +41,8 @@ python3 -m embody bind --body duck-1
 python3 -m embody whoami --body duck-1
 python3 -m embody policy attach --body duck-1 --hub neil-jo/microduck-walk --as walk
 python3 -m embody session start --body duck-1
+python3 -m embody push --watch --body duck-1
 python3 -m embody status
-python3 -m embody push --body duck-1
 # a body born without EMBODY_STUDIO_URL: python3 -m embody join --body duck-1
 ```
 

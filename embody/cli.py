@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 from typing import Any
 
 from embody.acn import AcnError, acn_base_url, api_key, fetch_me
@@ -32,7 +33,7 @@ from embody.models import (
 )
 from embody.join import JoinError, join_body, studio_configured
 from embody.push import PushError, post_show, push_document
-from embody.show import body_card, live_show, show_for
+from embody.show import body_card, live_show, public_runtime_error, show_for
 from embody.studio import DEFAULT_BIND, DEFAULT_PORT, serve as serve_studio
 from embody.store import load, save
 
@@ -42,7 +43,7 @@ class CliError(RuntimeError):
 
 
 def _dump(payload: dict[str, Any]) -> int:
-    print(json.dumps(payload, indent=2, ensure_ascii=False))
+    print(json.dumps(payload, indent=2, ensure_ascii=False), flush=True)
     return 0
 
 
@@ -460,6 +461,10 @@ def cmd_session_start(args: argparse.Namespace) -> int:
             "show": show_for(body, adapter=adapter),
             "adapter": adapter,
             "state": str(path),
+            "note": (
+                "sim is running. Keep the hosted room live in another terminal: "
+                f"python3 -m embody push --watch --body {_body_name(body)}"
+            ),
         }
     )
 
@@ -515,10 +520,24 @@ def cmd_session_status(args: argparse.Namespace) -> int:
 def cmd_session_stop(args: argparse.Namespace) -> int:
     state = load()
     body = _resolve_body(state, args.body)
-    adapter = run_adapter(body, "stop", dry_run=bool(args.dry_run))
+    adapter: dict[str, Any] | None = None
+    try:
+        adapter = run_adapter(body, "stop", dry_run=bool(args.dry_run))
+    except AdapterError as exc:
+        if args.dry_run:
+            raise CliError(str(exc)) from exc
+        adapter = {"ok": False, "error": public_runtime_error(exc)}
     body.session = None
     path = save(state)
-    return _dump({"ok": True, "body": body.name or body.id, "adapter": adapter, "state": str(path)})
+    return _dump(
+        {
+            "ok": True,
+            "body": body.name or body.id,
+            "adapter": adapter,
+            "state": str(path),
+            "note": "session cleared even if the sim was already gone",
+        }
+    )
 
 
 def cmd_status(_args: argparse.Namespace) -> int:
@@ -572,6 +591,8 @@ def cmd_show(args: argparse.Namespace) -> int:
 
 
 def cmd_push(args: argparse.Namespace) -> int:
+    if args.watch:
+        return cmd_push_watch(args)
     state = load()
     body = _resolve_body(state, args.body, need_bound=True)
     document = push_document(body)
@@ -582,6 +603,58 @@ def cmd_push(args: argparse.Namespace) -> int:
     except PushError as exc:
         raise CliError(str(exc)) from exc
     return _dump({"ok": True, "pushed": True, "room": remote.get("room"), "show": document["show"]})
+
+
+def cmd_push_watch(args: argparse.Namespace) -> int:
+    interval = float(args.interval)
+    if interval <= 0:
+        raise CliError("--interval must be > 0")
+    state = load()
+    body = _resolve_body(state, args.body, need_bound=True)
+    if body.session is None:
+        raise CliError(
+            f"no running session on {_body_name(body)} — "
+            f"python3 -m embody session start --body {_body_name(body)}"
+        )
+    if args.dry_run:
+        document = push_document(body)
+        return _dump(
+            {
+                "ok": True,
+                "dry_run": True,
+                "watch": True,
+                "interval": interval,
+                **document,
+            }
+        )
+    ticks = 0
+    try:
+        while True:
+            state = load()
+            body = _resolve_body(state, args.body, need_bound=True)
+            running = body.session is not None
+            document = push_document(body)
+            try:
+                remote = post_show(document)
+            except PushError as exc:
+                raise CliError(str(exc)) from exc
+            ticks += 1
+            _dump(
+                {
+                    "ok": True,
+                    "pushed": True,
+                    "watch": True,
+                    "tick": ticks,
+                    "room": remote.get("room"),
+                    "session_running": running,
+                    "show": document["show"],
+                }
+            )
+            if not running:
+                return 0
+            time.sleep(interval)
+    except KeyboardInterrupt:
+        return _dump({"ok": True, "watch": True, "tick": ticks, "stopped": "interrupt"})
 
 
 def cmd_studio(args: argparse.Namespace) -> int:
@@ -752,6 +825,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     pushed = sub.add_parser("push", help="write a Show snapshot to hosted owner studio")
     pushed.add_argument("--dry-run", action="store_true")
+    pushed.add_argument(
+        "--watch",
+        action="store_true",
+        help="keep pushing while this body's session runs (Ctrl+C stops watching, not the sim)",
+    )
+    pushed.add_argument("--interval", type=float, default=5.0, help="seconds between watch ticks")
     _add_body_flag(pushed)
     pushed.set_defaults(func=cmd_push)
 

@@ -22,6 +22,13 @@ function num(v: unknown, digits: number): string {
   return typeof v === "number" && Number.isFinite(v) ? v.toFixed(digits) : "—";
 }
 
+function shortNumbersError(raw: string): string {
+  if (/Traceback|Connection refused|Errno 61/i.test(raw)) {
+    return "本机仿真连不上（127.0.0.1:8765）。session start 后再 push。";
+  }
+  return raw.length > 240 ? `${raw.slice(0, 240)}…` : raw;
+}
+
 function Foot({ side, contact }: { side: string; contact?: boolean }) {
   return (
     <span className={`foot${contact ? " contact" : ""}`}>
@@ -43,7 +50,7 @@ function Telemetry({ body }: { body: BodyShow }) {
       <div className="telemetry">
         <div className="stat">
           <div className="label">遥测</div>
-          <p className="warn">数字读不到：{body.numbers_error}</p>
+          <p className="warn">数字读不到：{shortNumbersError(body.numbers_error)}</p>
         </div>
       </div>
     );

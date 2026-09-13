@@ -54,7 +54,8 @@ function asShow(raw: unknown): { show: BodyShow } | { error: string } {
         row.numbers && typeof row.numbers === "object"
           ? (row.numbers as Record<string, unknown>)
           : null,
-      numbers_error: typeof row.numbers_error === "string" ? row.numbers_error : undefined,
+      numbers_error:
+        typeof row.numbers_error === "string" ? row.numbers_error.slice(0, 240) : undefined,
       next: typeof row.next === "string" ? row.next : undefined,
       note: typeof row.note === "string" ? row.note : undefined,
     },
