@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires a joined ACN agent (ACN_API_KEY from POST /agents/join). First body kind needs microduck-plugin / microduck-skill. Optional: EMBODY_HOME, EMBODY_MICRODUCK_SKILL, ACN_BASE_URL, EMBODY_STUDIO_URL."
 metadata:
   author: acnlabs
-  version: "0.1.10"
+  version: "0.1.11"
   homepage: "https://github.com/acnlabs/embody"
   repository: "https://github.com/acnlabs/embody"
   product: embody
@@ -70,6 +70,8 @@ v0 Microduck examples — not a catalog, not official Pollen:
 | `neil-jo/microduck-walk` | perpetual (gait) | `session start` |
 | `neil-jo/microduck-polite-bow` | episodic (trick) | attach `--episodic`, then `session do` — never `start --as` this card |
 
+Attach `--as` must match the runtime skill slot (`polite_bow`), not the Hub repo slug. `session do ALIAS` is that same name.
+
 ```bash
 python3 -m embody policy attach --body duck-1 --hub neil-jo/microduck-walk --as walk
 python3 -m embody policy attach --body duck-1 --hub neil-jo/microduck-polite-bow --as polite_bow --episodic
@@ -81,11 +83,12 @@ Preview is on the model card. A raw `/resolve/main/preview.mp4` click downloads.
 
 `session start` calls `prepare` first. Walk is perpetual. Bow is episodic — `do`, never start that repo. v0 only drives `origin=sim`.
 
+You drive. The hosted page only observes. After `start` / `do` / `stop`, if `EMBODY_STUDIO_URL` is set, the CLI **pushes** the Show so the owner room updates. You do not need a second terminal for one trick. `push --watch` is only to keep walking numbers live.
+
 ```bash
 python3 -m embody session start --body duck-1
-python3 -m embody push --watch --body duck-1   # other terminal; room follows the sim
 python3 -m embody session pull --body duck-1 --as polite_bow
-python3 -m embody session do --body duck-1 polite_bow
+python3 -m embody session do --body duck-1 polite_bow   # pushes the trick frame
 python3 -m embody session stop --body duck-1
 ```
 
@@ -100,7 +103,7 @@ python3 -m embody session status
 
 `show.cards` is Hub preview + onnx. `show.origin` is birth. `show.numbers` is whatever the kind runtime printed. If the sim is down, `show` still prints cards and puts the error in `numbers_error`. Say the numbers. Do not invent `fallen`. Do not POST them to ACN through Embody — you write the ACN message yourself.
 
-While a session is running, `push --watch` repeats the snapshot until the session ends or you Ctrl+C (that stops watching, not the sim). Transient hosted-studio errors (SSL / proxy EOF) retry; 401/404 do not.
+While a session is running, `push --watch` repeats the snapshot until the session ends or you Ctrl+C (that stops watching, not the sim). Transient hosted-studio errors (SSL / proxy EOF / timeout) retry; 401/404 do not. Prefer watch for a long walk; `session do` already pushes the trick.
 
 ```bash
 python3 -m embody push --body duck-1

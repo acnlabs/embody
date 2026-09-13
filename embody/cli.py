@@ -48,6 +48,17 @@ def _dump(payload: dict[str, Any]) -> int:
     return 0
 
 
+def _owner_push(body: Body, *, show: dict[str, Any] | None = None) -> dict[str, Any] | None:
+    """Owner room follows the agent. Drive verbs push; the page does not drive."""
+    if not studio_configured():
+        return None
+    try:
+        remote = post_show(push_document(body, show=show))
+    except PushError as exc:
+        return {"ok": False, "error": str(exc)}
+    return {"ok": True, "room": remote.get("room"), "pushed": True}
+
+
 def _body_name(body: Body) -> str:
     return body.name or body.id
 
@@ -480,21 +491,26 @@ def cmd_session_start(args: argparse.Namespace) -> int:
         start_hub=policy.hub,
     )
     path = save(state)
-    return _dump(
-        {
-            "ok": True,
-            "body": body.name or body.id,
-            "session": body.session.to_dict(),
-            "policy": policy.to_dict(),
-            "show": show_for(body, adapter=adapter),
-            "adapter": adapter,
-            "state": str(path),
-            "note": (
-                "sim is running. Keep the hosted room live in another terminal: "
-                f"python3 -m embody push --watch --body {_body_name(body)}"
-            ),
-        }
-    )
+    show = show_for(body, adapter=adapter)
+    payload: dict[str, Any] = {
+        "ok": True,
+        "body": body.name or body.id,
+        "session": body.session.to_dict(),
+        "policy": policy.to_dict(),
+        "show": show,
+        "adapter": adapter,
+        "state": str(path),
+        "note": (
+            "sim is running. Keep the hosted room live with "
+            f"python3 -m embody push --watch --body {_body_name(body)} "
+            "or let session do push each trick."
+        ),
+    }
+    if not args.dry_run:
+        pushed = _owner_push(body, show=show)
+        if pushed is not None:
+            payload["pushed"] = pushed
+    return _dump(payload)
 
 
 def cmd_session_pull(args: argparse.Namespace) -> int:
@@ -527,15 +543,20 @@ def cmd_session_do(args: argparse.Namespace) -> int:
     if policy is None:
         raise CliError(f"unknown policy alias {args.alias!r}")
     adapter = run_adapter(body, "do", alias=policy.alias, dry_run=bool(args.dry_run))
-    return _dump(
-        {
-            "ok": True,
-            "body": body.name or body.id,
-            "policy": policy.to_dict(),
-            "show": show_for(body, adapter=adapter),
-            "adapter": adapter,
-        }
-    )
+    show = show_for(body, adapter=adapter)
+    payload: dict[str, Any] = {
+        "ok": True,
+        "body": body.name or body.id,
+        "policy": policy.to_dict(),
+        "show": show,
+        "adapter": adapter,
+        "note": "owner studio follows this push; the page does not drive",
+    }
+    if not args.dry_run:
+        pushed = _owner_push(body, show=show)
+        if pushed is not None:
+            payload["pushed"] = pushed
+    return _dump(payload)
 
 
 def cmd_session_status(args: argparse.Namespace) -> int:
@@ -557,15 +578,18 @@ def cmd_session_stop(args: argparse.Namespace) -> int:
         adapter = {"ok": False, "error": public_runtime_error(exc)}
     body.session = None
     path = save(state)
-    return _dump(
-        {
-            "ok": True,
-            "body": body.name or body.id,
-            "adapter": adapter,
-            "state": str(path),
-            "note": "session cleared even if the sim was already gone",
-        }
-    )
+    payload: dict[str, Any] = {
+        "ok": True,
+        "body": body.name or body.id,
+        "adapter": adapter,
+        "state": str(path),
+        "note": "session cleared even if the sim was already gone",
+    }
+    if not args.dry_run:
+        pushed = _owner_push(body)
+        if pushed is not None:
+            payload["pushed"] = pushed
+    return _dump(payload)
 
 
 def cmd_status(_args: argparse.Namespace) -> int:

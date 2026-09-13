@@ -303,6 +303,7 @@ def test_session_per_body_and_adapter_one_sim(
     did = json.loads(capsys.readouterr().out)
     assert did["show"]["numbers"] == {"tilt_deg": 2.0, "ok": True, "executed": True}
     assert did["show"]["cards"]
+    assert "pushed" not in did
     assert main(["session", "stop", "--body", "duck-1", "--dry-run"]) == 0
     assert load().body_by_token("duck-1").session is None
     assert main(["session", "start", "--body", "duck-2", "--dry-run"]) == 0
@@ -315,6 +316,42 @@ def test_session_per_body_and_adapter_one_sim(
     assert prep["argv"][0].endswith("doctor.sh")
     stopped = adapter_microduck.MicroduckRuntime().stop(dry_run=True)
     assert stopped["argv"][-1] == "shutdown"
+
+
+def test_session_do_pushes_owner_show(
+    home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _mock_skill(tmp_path, monkeypatch)
+    add_sim("duck-1")
+    bind_offline()
+    run(["policy", "attach", "--hub", "neil-jo/microduck-walk", "--as", "walk"])
+    run(
+        [
+            "policy",
+            "attach",
+            "--hub",
+            "neil-jo/microduck-polite-bow",
+            "--as",
+            "polite_bow",
+            "--episodic",
+        ]
+    )
+    stub = RegistryStub()
+    try:
+        monkeypatch.setenv("EMBODY_STUDIO_URL", stub.url)
+        monkeypatch.setenv("ACN_API_KEY", "acn_test")
+        capsys.readouterr()
+        assert main(["join", "--body", "duck-1"]) == 0
+        assert main(["session", "start", "--body", "duck-1"]) == 0
+        capsys.readouterr()
+        assert main(["session", "do", "--body", "duck-1", "polite_bow"]) == 0
+        out = json.loads(capsys.readouterr().out)
+        assert out["pushed"]["ok"] is True
+        assert out["show"]["numbers"]["executed"] is True
+        shows = [row for row in stub.requests if row["path"] == "/api/agent/show"]
+        assert shows[-1]["body"]["show"]["numbers"]["executed"] is True
+    finally:
+        stub.close()
 
 
 def test_show_keeps_cards_when_runtime_status_fails(

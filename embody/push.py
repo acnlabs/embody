@@ -40,7 +40,14 @@ def studio_url() -> str:
     return raw
 
 
-def push_document(body: Body) -> dict[str, Any]:
+def push_document(body: Body, *, show: dict[str, Any] | None = None) -> dict[str, Any]:
+    return {
+        "ok": True,
+        "audience": "owner",
+        "workplace": "studio",
+        "show": show if show is not None else live_show(body),
+        "note": "Observation snapshot. Embody web stores this; AgentPlanet does not.",
+    }
     return {
         "ok": True,
         "audience": "owner",
