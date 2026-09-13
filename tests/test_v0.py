@@ -10,7 +10,7 @@ from embody import adapter_microduck
 from embody.adapters import get_runtime
 from embody.cli import main
 from embody.models import Session, State, asset_ref, hub_resolve
-from embody.push import PushError, transient_push_error
+from embody.push import PushError, post_show, transient_push_error
 from embody.show import lift_runtime_numbers, public_runtime_error
 from embody.store import load, save, state_path
 
@@ -484,6 +484,24 @@ class RegistryStub:
                 self.end_headers()
                 self.wfile.write(raw)
 
+            def do_DELETE(self) -> None:
+                stub.requests.append(
+                    {"path": self.path, "auth": self.headers.get("Authorization"), "body": None}
+                )
+                prefix = "/api/agent/bodies/"
+                if self.path.startswith(prefix):
+                    wanted = self.path[len(prefix) :]
+                    stub.registered.discard(wanted)
+                    status, payload = 200, {"ok": True, "removed": wanted}
+                else:
+                    status, payload = 404, {"ok": False}
+                raw = json.dumps(payload).encode()
+                self.send_response(status)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(raw)))
+                self.end_headers()
+                self.wfile.write(raw)
+
             def log_message(self, *_args: object) -> None:
                 return
 
@@ -571,7 +589,8 @@ def test_body_add_joins_hosted_when_studio_set(
         assert join_req["body"]["origin"] == "sim"
         assert join_req["body"]["name"] == "duck-9"
         assert join_req["body"]["build"]["bom"] == "microduck-sim"
-        assert join_req["body"]["build"]["modules"]["camera"] is False
+        assert join_req["body"]["build"]["modules"]["imu"] is True
+        assert "camera" not in join_req["body"]["build"]["modules"]
         assert "id" not in join_req["body"]
     finally:
         stub.close()
@@ -599,19 +618,18 @@ def test_body_add_gets_kind_default_build(home: Path) -> None:
     body = load().bodies[0]
     assert body.build["bom"] == "microduck-sim"
     assert body.build["modules"]["imu"] is True
-    assert body.build["modules"]["camera"] is False
+    assert "camera" not in body.build["modules"]
 
 
-def test_body_add_build_overlay_merges_modules(home: Path) -> None:
+def test_body_add_build_overlay_rejects_sim_camera(home: Path, capsys: pytest.CaptureFixture[str]) -> None:
     argv = [
         "body", "add", "--kind", "microduck", "--origin", "sim", "--name", "duck-cam",
         "--build", '{"bom": "microduck-sim-cam", "modules": {"camera": true}}',
     ]
-    assert main(argv) == 0
-    modules = load().bodies[0].build["modules"]
-    assert load().bodies[0].build["bom"] == "microduck-sim-cam"
-    assert modules["camera"] is True
-    assert modules["imu"] is True
+    assert main(argv) == 1
+    err = json.loads(capsys.readouterr().err)
+    assert "camera" in err["error"]
+    assert load().bodies == []
 
 
 def test_body_add_build_rejects_non_object(home: Path) -> None:
@@ -629,30 +647,35 @@ def test_body_build_set_unset_replace(home: Path, capsys: pytest.CaptureFixture[
     assert shown["build"]["bom"] == "microduck-sim"
 
     argv = ["body", "build", "--body", "duck-1",
-            "--set", "modules.camera=true", "--set", "serial=MD-0001"]
+            "--set", "serial=MD-0001"]
     assert main(argv) == 0
     out = json.loads(capsys.readouterr().out)
     assert out["changed"] is True
-    assert out["build"]["modules"]["camera"] is True
     assert out["build"]["serial"] == "MD-0001"
-
-    assert main(["body", "build", "--body", "duck-1", "--unset", "modules.camera"]) == 0
-    out = json.loads(capsys.readouterr().out)
     assert "camera" not in out["build"]["modules"]
+
+    assert main(["body", "build", "--body", "duck-1", "--set", "modules.camera=true"]) == 1
+    err = json.loads(capsys.readouterr().err)
+    assert "camera" in err["error"]
+
+    assert main(["body", "build", "--body", "duck-1", "--unset", "serial"]) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert "serial" not in out["build"]
     assert out["build"]["modules"]["imu"] is True
 
     assert main(["body", "build", "--body", "duck-1", "--replace", '{"bom": "bare"}']) == 0
     out = json.loads(capsys.readouterr().out)
     assert out["build"] == {"bom": "bare"}
 
-    assert main(["body", "build", "--body", "duck-1", "--set", "modules.camera=True"]) == 0
+    assert main(["body", "build", "--body", "duck-1", "--set", "modules.imu=True"]) == 0
     out = json.loads(capsys.readouterr().out)
-    assert out["build"]["modules"]["camera"] is True
+    assert out["build"]["modules"]["imu"] is True
 
     assert main(["body", "build", "--body", "duck-1", "--replace", "{}"]) == 0
     out = json.loads(capsys.readouterr().out)
     assert out["build"]["bom"] == "microduck-sim"
     assert out["build"]["modules"]["imu"] is True
+    assert "camera" not in out["build"]["modules"]
 
     assert main(["body", "build", "--body", "duck-1", "--set", "bad-item"]) == 1
 
@@ -662,7 +685,7 @@ def test_push_carries_build(
 ) -> None:
     add_sim("duck-1")
     bind_offline()
-    run(["body", "build", "--body", "duck-1", "--set", "modules.camera=true"])
+    run(["body", "build", "--body", "duck-1", "--set", "serial=MD-0001"])
     stub = RegistryStub()
     try:
         monkeypatch.setenv("EMBODY_STUDIO_URL", stub.url)
@@ -673,8 +696,9 @@ def test_push_carries_build(
         capsys.readouterr()
         push_req = stub.requests[-1]
         build = push_req["body"]["show"]["build"]
-        assert build["modules"]["camera"] is True
+        assert build["serial"] == "MD-0001"
         assert build["modules"]["imu"] is True
+        assert "camera" not in build["modules"]
     finally:
         stub.close()
 
@@ -697,7 +721,46 @@ def test_load_backfills_missing_and_empty_build(home: Path) -> None:
     data = json.loads(path.read_text(encoding="utf-8"))
     data["bodies"][0]["build"] = {}
     path.write_text(json.dumps(data), encoding="utf-8")
-    assert load().bodies[0].build["modules"]["camera"] is False
+    assert load().bodies[0].build["modules"]["imu"] is True
+    assert "camera" not in load().bodies[0].build["modules"]
+
+
+def test_load_strips_unevidenced_sim_camera(home: Path) -> None:
+    add_sim("duck-1")
+    path = state_path()
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["bodies"][0]["build"]["modules"]["camera"] = True
+    path.write_text(json.dumps(data), encoding="utf-8")
+    body = load().bodies[0]
+    assert "camera" not in body.build["modules"]
+    assert body.build["modules"]["imu"] is True
+    on_disk = json.loads(path.read_text(encoding="utf-8"))
+    assert "camera" not in on_disk["bodies"][0]["build"]["modules"]
+
+
+def test_body_rm_drops_local_and_hosted(
+    home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    add_sim("duck-1")
+    bind_offline()
+    stub = RegistryStub()
+    try:
+        monkeypatch.setenv("EMBODY_STUDIO_URL", stub.url)
+        monkeypatch.setenv("ACN_API_KEY", "acn_test")
+        capsys.readouterr()
+        assert main(["join", "--body", "duck-1"]) == 0
+        local_id = load().bodies[0].id
+        assert local_id in stub.registered
+        capsys.readouterr()
+        assert main(["body", "rm", "--body", "duck-1"]) == 0
+        out = json.loads(capsys.readouterr().out)
+        assert out["removed"] == "duck-1"
+        assert out["hosted"] is True
+        assert load().bodies == []
+        assert stub.requests[-1]["path"] == f"/api/agent/bodies/{local_id}"
+        assert local_id not in stub.registered
+    finally:
+        stub.close()
 
 
 def test_body_add_build_rejects_too_large(home: Path) -> None:
@@ -774,9 +837,25 @@ def test_push_watch_stops_when_session_ends(
 
 def test_transient_push_error_classifies() -> None:
     assert transient_push_error(PushError("embody web unreachable: [SSL: UNEXPECTED_EOF_WHILE_READING]"))
+    assert transient_push_error(PushError("embody web unreachable: timed out"))
     assert transient_push_error(PushError("embody web push failed (503): oops"))
     assert not transient_push_error(PushError("embody web push failed (401): ACN bearer required"))
     assert not transient_push_error(PushError("ACN_API_KEY is required to push (hosted studio checks /agents/me)"))
+
+
+def test_post_show_wraps_timeout_as_transient(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def boom(*_args: object, **_kwargs: object) -> object:
+        raise TimeoutError("The read operation timed out")
+
+    monkeypatch.setattr("embody.push.urllib.request.urlopen", boom)
+    monkeypatch.setenv("EMBODY_STUDIO_URL", "https://example.invalid")
+    monkeypatch.setenv("ACN_API_KEY", "acn_test")
+    with pytest.raises(PushError) as caught:
+        post_show({"show": {}})
+    assert "timed out" in str(caught.value)
+    assert transient_push_error(caught.value)
 
 
 def test_push_watch_retries_ssl_then_succeeds(

@@ -6,7 +6,7 @@ import re
 from typing import Any
 
 from embody.adapter_microduck import ADAPTER_ID, AdapterError as KindError, MicroduckRuntime
-from embody.models import Body, Policy, State
+from embody.models import ORIGIN_SIM, Body, Policy, State
 from embody.runtime import BodyRuntime, BodyRuntimeError
 
 
@@ -52,6 +52,48 @@ def fill_build(body: Body) -> bool:
         return False
     body.build = filled
     return True
+
+
+def sim_modules_allowed(kind: str) -> set[str]:
+    modules = default_build_for(kind).get("modules")
+    if not isinstance(modules, dict):
+        return set()
+    return {key for key, value in modules.items() if value is True}
+
+
+def scrub_sim_build(body: Body) -> bool:
+    """Drop sim module keys the kind does not evidence (e.g. leftover camera)."""
+    if body.origin != ORIGIN_SIM or not body.build:
+        return False
+    if not default_build_for(body.kind):
+        return False
+    modules = body.build.get("modules")
+    if not isinstance(modules, dict):
+        return False
+    allowed = sim_modules_allowed(body.kind)
+    kept = {key: value for key, value in modules.items() if key in allowed}
+    if kept == modules:
+        return False
+    body.build = {**body.build, "modules": kept}
+    return True
+
+
+def assert_sim_build(origin: str, kind: str, build: dict[str, Any]) -> dict[str, Any]:
+    """Sim may only declare modules the kind runtime evidents. Size-capped either origin."""
+    if origin == ORIGIN_SIM and default_build_for(kind):
+        modules = build.get("modules")
+        if isinstance(modules, dict):
+            allowed = sim_modules_allowed(kind)
+            unknown = sorted(key for key in modules if key not in allowed)
+            if unknown:
+                have = ", ".join(sorted(allowed)) or "none"
+                raise BodyRuntimeError(
+                    f"sim cannot declare modules {', '.join(unknown)}; "
+                    f"this kind's sim evidents {have}. "
+                    "Official Microduck policy obs is 61-dim proprioception + commands "
+                    "(no onboard camera). Record a real camera at robot pairing."
+                )
+    return assert_build_size(build)
 
 
 def assert_build_size(build: dict[str, Any]) -> dict[str, Any]:

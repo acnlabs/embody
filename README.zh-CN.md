@@ -19,6 +19,8 @@ microduck-plugin   第一种运行时 — v0 探针，不是本平台
 
 一只已 join 的 ACN agent 可以有多具身体。每具身体有自己的 `kind`。会话按 kind 找机型运行时。v0 开 Microduck 仿真；别的 kind 可以先记账。Microduck 运行时本机同时只稳跑一场。
 
+`kind` 是控制契约；`build` 是这一台的装配清单。Microduck 仿真只记官方 61 维观测里有的东西（`imu`、`foot_contact`），不能手写 `camera`。真机前置摄像头在配对时再记。
+
 ACN join 不会自动有身体。设了 `EMBODY_STUDIO_URL` 时，`body add --origin sim` 先 **join 托管 studio**——注册表铸造 body id——再在本机实例化（没设 URL 时 id 只是本机的，`embody join` 收养后才能 push；真机配对不进本探针）。然后 `bind`、`whoami`。Hub 卡由 agent 自己找；`policy attach` 只收指针。`show` / `status` 给卡片和数字；`push` 更新一具已 join 的身体到 **托管** 的 owner studio（`web/`）。回 ACN 是 agent 自己的事。网页不开车。本机 `embody studio` 只是调试 Show，不是产品。第二种机型、训练 CLI 不进本探针。
 
 ## 安装

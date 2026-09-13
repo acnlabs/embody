@@ -18,6 +18,23 @@ function keyNumber(body: BodyShow): string | null {
   return null;
 }
 
+function ModuleChips({ body }: { body: BodyShow }) {
+  const raw = body.build?.modules;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const entries = Object.entries(raw as Record<string, unknown>);
+  if (!entries.length) return null;
+  return (
+    <p className="module-list home-modules">
+      {entries.map(([name, value]) => (
+        <span key={name} className={`badge module${value === false || value == null ? " off" : ""}`}>
+          {name}
+          {typeof value === "boolean" ? (value ? "" : " 无") : ""}
+        </span>
+      ))}
+    </p>
+  );
+}
+
 export function BodyCard({ body }: { body: BodyShow }) {
   const key = keyNumber(body);
   return (
@@ -39,6 +56,7 @@ export function BodyCard({ body }: { body: BodyShow }) {
         <p className="meta">
           {body.origin} · agent {body.bound_agent_id.slice(0, 8)}… · {body.cards?.length || 0} 张卡
         </p>
+        <ModuleChips body={body} />
       </div>
     </article>
   );

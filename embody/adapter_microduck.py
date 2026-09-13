@@ -70,11 +70,13 @@ class MicroduckRuntime:
 
     kind = KIND
     adapter_id = ADAPTER_ID
-    # Sim sensor set, as evidenced by runtime telemetry (tilt + foot contact).
-    # The sim model carries no camera.
+    # Evidenced by the official 61-dim policy obs (gyro, projected gravity,
+    # joints, last action, commands) and by status telemetry (tilt + feet).
+    # Pollen lists a front camera on the real robot; it is not in that sim
+    # contract. Do not put `camera` on a sim build.
     default_build = {
         "bom": "microduck-sim",
-        "modules": {"imu": True, "foot_contact": True, "camera": False},
+        "modules": {"imu": True, "foot_contact": True},
     }
 
     def guard_start(self, state, body) -> None:

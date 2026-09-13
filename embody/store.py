@@ -4,7 +4,7 @@ import json
 import os
 from pathlib import Path
 
-from embody.adapters import fill_build
+from embody.adapters import fill_build, scrub_sim_build
 from embody.models import State
 
 
@@ -27,7 +27,11 @@ def load(home: Path | None = None) -> State:
     if not isinstance(data, dict):
         raise ValueError(f"corrupt embody state: {path}")
     state = State.from_dict(data)
-    if any(fill_build(body) for body in state.bodies):
+    dirty = False
+    for body in state.bodies:
+        if fill_build(body) or scrub_sim_build(body):
+            dirty = True
+    if dirty:
         save(state, home)
     return state
 

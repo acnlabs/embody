@@ -72,7 +72,7 @@ A runtime registers `kind` → adapter id, a `default_build` (the as-built manif
 
 | `kind` | Runtime | `default_build` | Notes |
 |---|---|---|---|
-| `microduck` | microduck-skill | `bom=microduck-sim`; modules `imu`, `foot_contact`; no `camera` | `prepare` → `doctor.sh --clone` then adopt default checkout; `stop` → `control.sh shutdown`; other verbs → `control.sh`; one localhost sim |
+| `microduck` | microduck-skill | `bom=microduck-sim`; modules `imu`, `foot_contact` (no `camera`: official 61-dim obs has no image) | `prepare` → `doctor.sh --clone` then adopt default checkout; `stop` → `control.sh shutdown`; other verbs → `control.sh`; one localhost sim |
 | other slugs | none | empty | Body and cards may exist; session errors |
 
 Do not lift into the kernel: observation/action size, PPO, Jobs, `robotctl`, Viser, joint indices, Hub search. The build is a record; policy hardware-gating on attach is a later seam.

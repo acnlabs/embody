@@ -11,6 +11,7 @@ from embody.adapters import (
     AdapterError,
     adapter_id_for,
     assert_build_size,
+    assert_sim_build,
     default_build_for,
     fill_build,
     guard_concurrency,
@@ -31,7 +32,7 @@ from embody.models import (
     utc_now,
     validate_origin,
 )
-from embody.join import JoinError, join_body, studio_configured
+from embody.join import JoinError, join_body, leave_body, studio_configured
 from embody.push import PushError, post_show, push_document, transient_push_error
 from embody.show import body_card, live_show, public_runtime_error, show_for
 from embody.studio import DEFAULT_BIND, DEFAULT_PORT, serve as serve_studio
@@ -173,7 +174,7 @@ def _parse_build_json(raw: str) -> dict[str, Any]:
     except json.JSONDecodeError as exc:
         raise CliError(f"--build / --replace takes a JSON object: {exc}") from exc
     if not isinstance(parsed, dict):
-        raise CliError("build must be a JSON object, e.g. '{\"modules\": {\"camera\": true}}'")
+        raise CliError("build must be a JSON object, e.g. '{\"serial\": \"MD-0001\"}'")
     try:
         return assert_build_size(parsed)
     except AdapterError as exc:
@@ -193,7 +194,7 @@ def _merge_build(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any
 def _set_dot_path(build: dict[str, Any], path: str, value: Any) -> None:
     keys = [k for k in path.split(".") if k]
     if not keys:
-        raise CliError("--set needs a key, e.g. --set modules.camera=true")
+        raise CliError("--set needs a key, e.g. --set serial=MD-0001")
     node = build
     for key in keys[:-1]:
         nxt = node.get(key)
@@ -237,10 +238,10 @@ def cmd_body_add(args: argparse.Namespace) -> int:
     build = default_build_for(kind)
     if args.build:
         build = _merge_build(build, _parse_build_json(args.build))
-        try:
-            assert_build_size(build)
-        except AdapterError as exc:
-            raise CliError(str(exc)) from exc
+    try:
+        build = assert_sim_build(origin, kind, build)
+    except AdapterError as exc:
+        raise CliError(str(exc)) from exc
     joined: dict[str, Any] | None = None
     if studio_configured():
         joined = join_body(name=name, kind=kind, origin=origin, build=build)
@@ -323,6 +324,33 @@ def cmd_body_list(_args: argparse.Namespace) -> int:
     )
 
 
+def cmd_body_rm(args: argparse.Namespace) -> int:
+    if not args.body:
+        raise CliError("body rm needs --body")
+    state = load()
+    body = _resolve_body(state, args.body, need_bound=False)
+    if body.session is not None:
+        raise CliError(
+            f"{_body_name(body)} has a running session; "
+            f"stop it first: python3 -m embody session stop --body {_body_name(body)}"
+        )
+    hosted = False
+    if studio_configured():
+        leave_body(body.id)
+        hosted = True
+    state.bodies = [row for row in state.bodies if row.id != body.id]
+    path = save(state)
+    return _dump(
+        {
+            "ok": True,
+            "removed": _body_name(body),
+            "id": body.id,
+            "hosted": hosted,
+            "state": str(path),
+        }
+    )
+
+
 def cmd_body_build(args: argparse.Namespace) -> int:
     state = load()
     body = _resolve_body(state, args.body, need_bound=False)
@@ -342,7 +370,7 @@ def cmd_body_build(args: argparse.Namespace) -> int:
     if fill_build(body):
         changed = True
     try:
-        assert_build_size(body.build)
+        body.build = assert_sim_build(body.origin, body.kind, body.build)
     except AdapterError as exc:
         raise CliError(str(exc)) from exc
     if changed:
@@ -774,6 +802,9 @@ def build_parser() -> argparse.ArgumentParser:
     add.set_defaults(func=cmd_body_add)
     listed = body_sub.add_parser("list")
     listed.set_defaults(func=cmd_body_list)
+    removed = body_sub.add_parser("rm", help="drop a body from this machine and the hosted registry")
+    _add_body_flag(removed)
+    removed.set_defaults(func=cmd_body_rm)
     buildc = body_sub.add_parser("build", help="show / edit this unit's as-built manifest")
     buildc.add_argument("--set", action="append", metavar="KEY=VALUE", help="dot path, JSON value")
     buildc.add_argument("--unset", action="append", metavar="KEY")

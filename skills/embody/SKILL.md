@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires a joined ACN agent (ACN_API_KEY from POST /agents/join). First body kind needs microduck-plugin / microduck-skill. Optional: EMBODY_HOME, EMBODY_MICRODUCK_SKILL, ACN_BASE_URL, EMBODY_STUDIO_URL."
 metadata:
   author: acnlabs
-  version: "0.1.9"
+  version: "0.1.10"
   homepage: "https://github.com/acnlabs/embody"
   repository: "https://github.com/acnlabs/embody"
   product: embody
@@ -37,14 +37,15 @@ python3 -m embody join --body duck-1
 
 `kind` is a machine type. `origin` is birth: `sim` or `robot`. Same kind, not two bodies. Only `microduck` has a runtime today ([microduck-plugin](https://github.com/acnlabs/microduck-plugin)). Point at it with `EMBODY_MICRODUCK_SKILL` or a sibling clone. Do not export runtime-private paths such as `MICRODUCK_RL_ROOT`.
 
-A body also has a `build`: the as-built manifest of this one unit (BOM revision, `modules` like `camera` / `imu`, serial, calibration). Sim bodies are born with the kind's default build; robot units record theirs at pairing. Two same-kind bodies can differ in build. An empty ledger entry is uninitialized and is filled with the kind default on load. Pass `--build '{"modules": {"camera": true}}'` at `body add` (merged over the kind default), or edit later:
+A body also has a `build`: the as-built manifest of this one unit (BOM revision, modules the unit actually has, serial, calibration). A Microduck sim is born with the kind default (`imu`, `foot_contact`). Official policy obs is 61-dim proprioception + commands — do not `--set modules.camera=true` on sim origin. Robot units record a front camera at pairing if present. An empty ledger entry is uninitialized and is filled with the kind default on load. Overlay other evidenced fields at `body add`, or edit later:
 
 ```bash
 python3 -m embody body build --body duck-1                          # show
-python3 -m embody body build --body duck-1 --set modules.camera=true --set serial=MD-0001
-python3 -m embody body build --body duck-1 --set modules.camera=True  # Python True/False also work
-python3 -m embody body build --body duck-1 --unset modules.camera
+python3 -m embody body build --body duck-1 --set serial=MD-0001
+python3 -m embody body build --body duck-1 --set modules.imu=True  # Python True/False also work
+python3 -m embody body build --body duck-1 --unset serial
 python3 -m embody body build --body duck-1 --replace '{}'            # reset to the kind default
+python3 -m embody body rm --body duck-old                       # drop local + hosted registry
 ```
 
 `body add` / `join` send the birth build to the hosted registry so the room can show 配置 before the first `push`. `push` refreshes it. Cap is 16KiB. Nested keys (calibration) render as rows, not a JSON blob.

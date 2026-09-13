@@ -97,3 +97,17 @@ export async function listBodiesForAgents(agentIds: string[]): Promise<BodyShow[
   const allow = new Set(agentIds);
   return Object.values((await readLedger()).bodies).filter((row) => allow.has(row.bound_agent_id));
 }
+
+export async function deleteBody(id: string): Promise<BodyShow | null> {
+  const existing = await getBody(id);
+  if (!existing) return null;
+  if (useKv()) {
+    const client = await kv();
+    await client.hdel(KV_KEY, id);
+    return existing;
+  }
+  const ledger = readFile();
+  delete ledger.bodies[id];
+  writeFile(ledger);
+  return existing;
+}

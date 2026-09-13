@@ -73,6 +73,8 @@ def post_show(document: dict[str, Any], *, timeout: float = 15.0) -> dict[str, A
         raise PushError(f"embody web push failed ({exc.code}): {body}") from exc
     except urllib.error.URLError as exc:
         raise PushError(f"embody web unreachable: {exc.reason}") from exc
+    except TimeoutError as exc:
+        raise PushError("embody web unreachable: timed out") from exc
     if not isinstance(payload, dict):
         raise PushError("embody web returned a non-object")
     return payload
