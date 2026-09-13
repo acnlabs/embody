@@ -58,7 +58,7 @@ Hub                  weights. Agent finds the card. attach stores a pointer.
 
 ```text
 ACN agent (protagonist)
-  → body add --origin sim      (create; robot acquire is out of this probe)
+  → body add --origin sim | robot   (robot probes a unit; session still sim-only)
   → bind                       (this body ↔ this agent)
   → whoami                     (this body asks ACN who it is bound to)
   → agent finds a Hub card
@@ -104,7 +104,7 @@ Policy preview: `https://huggingface.co/{repo}/resolve/main/preview.mp4`. A raw 
 
 | Verb | North star | v0 probe |
 |---|---|---|
-| Acquire | Create a sim or later acquire a real unit | `body add --origin sim` (robot pair out of probe) |
+| Acquire | Create a sim or acquire a real unit | `body add --origin sim`. `--origin robot` probes (`robotctl health --json`); no unit → fail. Session still sim-only |
 | Bind | This body ↔ this agent; body asks ACN | `bind`, then `whoami` |
 | Train | Studio verb; the kind runtime trains (no generic PPO in the kernel) | Runtime only. No `train` in this kernel. |
 | Manage | Many bodies, many cards, venues | `body` / `policy` list, attach |
@@ -128,7 +128,7 @@ Microduck examples (not bundled, not official Pollen): `neil-jo/microduck-walk` 
 
 One trick, one graph. Hub delivery. Agent finds the card. Cards report numbers. Robot commands print by default. A second kind is a new runtime, not a kernel feature.
 
-Out of this probe: Jobs training CLI, real-robot pair, Credits, a second body kind, leaderboards, Hub search in Embody, any Embody↔ACN task pipe.
+Out of this probe: Jobs training CLI, real-robot **session**, Credits, a second body kind, leaderboards, Hub search in Embody, any Embody↔ACN task pipe.
 
 ## What is not a control plane
 

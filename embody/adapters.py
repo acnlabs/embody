@@ -107,6 +107,20 @@ def get_runtime(kind: str) -> BodyRuntime | None:
     return _RUNTIMES.get(kind)
 
 
+def probe_unit(kind: str) -> dict[str, Any]:
+    """Kind runtime reads the physical unit. Kernel does not call robotctl."""
+    runtime = get_runtime(kind)
+    if runtime is None:
+        raise BodyRuntimeError(
+            f"no kind runtime for kind={kind!r}; cannot pair a robot. "
+            "See docs/product/body-runtime-v0.md."
+        )
+    try:
+        return runtime.probe()
+    except KindError as exc:
+        raise BodyRuntimeError(str(exc)) from exc
+
+
 def guard_concurrency(state: State, body: Body) -> None:
     runtime = get_runtime(body.kind)
     if runtime is None:

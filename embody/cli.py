@@ -15,6 +15,7 @@ from embody.adapters import (
     default_build_for,
     fill_build,
     guard_concurrency,
+    probe_unit,
     run as run_adapter,
     validate_kind,
 )
@@ -240,19 +241,27 @@ def _parse_set_value(raw: str) -> Any:
 def cmd_body_add(args: argparse.Namespace) -> int:
     kind = validate_kind(args.kind)
     origin = validate_origin(args.origin)
-    if origin == ORIGIN_ROBOT:
-        raise CliError("real-robot pair is out of this probe. Create a sim: --origin sim")
     state = load()
     name = args.name
     if name and any(b.name == name for b in state.bodies):
         raise CliError(f"body name {name!r} already exists")
-    build = default_build_for(kind)
-    if args.build:
-        build = _merge_build(build, _parse_build_json(args.build))
-    try:
-        build = assert_sim_build(origin, kind, build)
-    except AdapterError as exc:
-        raise CliError(str(exc)) from exc
+    probed = None
+    if origin == ORIGIN_ROBOT:
+        if args.build:
+            raise CliError("robot build comes from probe, not --build")
+        try:
+            probed = probe_unit(kind)
+            build = assert_build_size(probed["build"])
+        except AdapterError as exc:
+            raise CliError(str(exc)) from exc
+    else:
+        build = default_build_for(kind)
+        if args.build:
+            build = _merge_build(build, _parse_build_json(args.build))
+        try:
+            build = assert_sim_build(origin, kind, build)
+        except AdapterError as exc:
+            raise CliError(str(exc)) from exc
     joined: dict[str, Any] | None = None
     if studio_configured():
         joined = join_body(name=name, kind=kind, origin=origin, build=build)
@@ -291,6 +300,9 @@ def cmd_body_add(args: argparse.Namespace) -> int:
     if joined:
         payload["joined"] = True
         payload["room"] = joined.get("room")
+    if probed:
+        payload["probe"] = {"via": probed.get("via")}
+        payload["note"] += " origin=robot has no session in this probe; attach and push only."
     if body.adapter == "none":
         payload["note"] += (
             f" kind={kind!r} has no runtime yet; session waits until one exists."

@@ -20,6 +20,7 @@ def home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setenv("EMBODY_HOME", str(tmp_path))
     monkeypatch.delenv("ACN_API_KEY", raising=False)
     monkeypatch.delenv("EMBODY_STUDIO_URL", raising=False)
+    monkeypatch.delenv("EMBODY_ROBOT_PROBE", raising=False)
     return tmp_path
 
 
@@ -168,8 +169,62 @@ def test_switch_agent_needs_replace(home: Path) -> None:
     assert state.bodies[0].bound_agent_id == "agent-2"
 
 
-def test_origin_robot_refused(home: Path) -> None:
+def test_origin_robot_refused_without_unit(home: Path, capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["body", "add", "--kind", "microduck", "--origin", "robot"]) == 1
+    err = json.loads(capsys.readouterr().err)
+    assert "no Microduck reachable" in err["error"]
+    assert load().bodies == []
+
+
+def test_origin_robot_records_probe_build(
+    home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    fixture = tmp_path / "health.json"
+    fixture.write_text(
+        json.dumps(
+            {
+                "serial": "MD-PROBE-1",
+                "imu": {"ok": True},
+                "media": {"camera": True},
+                "tof": {"present": True},
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("EMBODY_ROBOT_PROBE", str(fixture))
+    capsys.readouterr()
+    assert main(["body", "add", "--kind", "microduck", "--origin", "robot", "--name", "duck-real"]) == 0
+    out = json.loads(capsys.readouterr().out)
+    body = load().bodies[0]
+    assert body.origin == "robot"
+    assert body.build["serial"] == "MD-PROBE-1"
+    assert body.build["modules"]["camera"] is True
+    assert body.build["modules"]["imu"] is True
+    assert body.build["modules"]["tof"] is True
+    assert out["probe"]["via"] == "fixture"
+    bind_offline(body="duck-real")
+    run(["policy", "attach", "--body", "duck-real", "--hub", "neil-jo/microduck-walk", "--as", "walk"])
+    capsys.readouterr()
+    assert main(["session", "start", "--body", "duck-real", "--dry-run"]) == 1
+    err = json.loads(capsys.readouterr().err)
+    assert "origin=robot" in err["error"]
+
+
+def test_origin_robot_rejects_handwritten_build(home: Path) -> None:
+    assert main(
+        ["body", "add", "--origin", "robot", "--build", '{"modules":{"camera":true}}']
+    ) == 1
+
+
+def test_build_from_probe_skips_unknown_keys() -> None:
+    from embody.adapter_microduck import build_from_probe
+
+    build = build_from_probe({"serial": "X", "noise": 1})
+    assert build == {"bom": "microduck", "serial": "X"}
+    build = build_from_probe({"media": {"camera": False}, "imu": False})
+    assert build["modules"]["camera"] is False
+    assert build["modules"]["imu"] is False
+    assert "foot_contact" not in build["modules"]
 
 
 def test_whoami_mismatch(home: Path) -> None:

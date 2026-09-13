@@ -27,11 +27,11 @@ The agent is the protagonist. Join ACN does not create a body. Origin is written
 | Path | Meaning | v0 |
 |---|---|---|
 | Create | `body add --kind … --origin sim` — this machine opens a sim of that kind. | yes |
-| Acquire | `--origin robot` — pair a physical unit. Same `kind`, not a second body. | out of probe |
+| Acquire | `--origin robot` — pair a physical unit. Same `kind`, not a second body. | probe: `robotctl health --json` (or `EMBODY_ROBOT_PROBE` fixture). No unit → fail. Session still `origin=sim` only |
 | Bind | `bind` — this body ↔ this agent. | yes |
 | Confirm | `whoami` — this body asks ACN who it is bound to. | yes |
 
-Do not mint `microduck-sim` and `microduck-real` as two bodies. Same Hub cards. Session follows the body's `origin`. v0 only starts `origin=sim`.
+Do not mint `microduck-sim` and `microduck-real` as two kinds. Same Hub cards. Session follows the body's `origin`. v0 only starts `origin=sim`. `--origin robot` probes a unit and records its build; it does not start a session.
 
 ## Policy card
 

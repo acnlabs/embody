@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import os
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -128,6 +130,11 @@ class MicroduckRuntime:
     def stop(self, *, dry_run: bool) -> dict:
         return _checked("shutdown", dry_run=dry_run)
 
+    def probe(self) -> dict:
+        """Read-only. Record this unit's as-built. Does not start a session or robotctl policy."""
+        payload, via = _probe_payload()
+        return {"ok": True, "via": via, "build": build_from_probe(payload)}
+
 
 def _default_rl_root() -> Path:
     return Path.home() / ".local" / "src" / "microduck_rl"
@@ -162,3 +169,120 @@ def _checked(*args: str, dry_run: bool) -> dict:
         err = str(result.get("stderr") or result.get("stdout") or "microduck-skill failed")
         raise AdapterError(err.strip() or "microduck-skill failed")
     return result
+
+
+PROBE_ENV = "EMBODY_ROBOT_PROBE"
+_MODULE_ALIASES = {
+    "imu": ("imu",),
+    "foot_contact": ("foot_contact", "feet"),
+    "camera": ("camera",),
+    "tof": ("tof", "lidar"),
+}
+
+
+def _walk_dicts(obj: object):
+    if isinstance(obj, dict):
+        yield obj
+        for value in obj.values():
+            yield from _walk_dicts(value)
+    elif isinstance(obj, list):
+        for item in obj:
+            yield from _walk_dicts(item)
+
+
+def _first_str(payload: dict, keys: tuple[str, ...]) -> str | None:
+    for node in _walk_dicts(payload):
+        for key in keys:
+            value = node.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+    return None
+
+
+def _explicit_bool(value: object) -> bool | None:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, dict):
+        if isinstance(value.get("present"), bool):
+            return bool(value["present"])
+        if isinstance(value.get("ok"), bool):
+            return bool(value["ok"])
+        if isinstance(value.get("camera"), bool):
+            return bool(value["camera"])
+    return None
+
+
+def _module_flag(payload: dict, names: tuple[str, ...]) -> bool | None:
+    for node in _walk_dicts(payload):
+        for name in names:
+            if name not in node:
+                continue
+            flag = _explicit_bool(node[name])
+            if flag is not None:
+                return flag
+    return None
+
+
+def build_from_probe(payload: dict) -> dict:
+    """As-built from a probe payload. Missing keys stay missing."""
+    if not isinstance(payload, dict):
+        raise AdapterError("robot probe payload must be a JSON object")
+    build: dict = {"bom": "microduck"}
+    serial = _first_str(payload, ("serial", "serial_number", "device_serial"))
+    if serial:
+        build["serial"] = serial
+    modules: dict[str, bool] = {}
+    for name, aliases in _MODULE_ALIASES.items():
+        flag = _module_flag(payload, aliases)
+        if flag is not None:
+            modules[name] = flag
+    if modules:
+        build["modules"] = modules
+    return build
+
+
+def _probe_payload() -> tuple[dict, str]:
+    fixture = (os.environ.get(PROBE_ENV) or "").strip()
+    if fixture:
+        path = Path(fixture).expanduser()
+        if not path.is_file():
+            raise AdapterError(f"{PROBE_ENV} is not a file: {path}")
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise AdapterError(f"{PROBE_ENV} is not JSON: {exc}") from exc
+        if not isinstance(payload, dict):
+            raise AdapterError(f"{PROBE_ENV} must be a JSON object")
+        return payload, "fixture"
+
+    robotctl = shutil.which("robotctl")
+    if not robotctl:
+        raise AdapterError(
+            "no Microduck reachable: robotctl is not on PATH. "
+            "Pairing records a unit this runtime can probe (robotctl health --json). "
+            "This machine has no duck. Create a sim: --origin sim"
+        )
+    try:
+        proc = subprocess.run(
+            [robotctl, "health", "--json"],
+            check=False,
+            text=True,
+            capture_output=True,
+            timeout=8,
+        )
+    except TimeoutError as exc:
+        raise AdapterError("no Microduck reachable: robotctl health timed out") from exc
+    if proc.returncode != 0:
+        err = (proc.stderr or proc.stdout or "robotctl health failed").strip()
+        raise AdapterError(
+            f"no Microduck reachable: {err[:240]}. Create a sim: --origin sim"
+        )
+    try:
+        payload = json.loads(proc.stdout)
+    except json.JSONDecodeError as exc:
+        raise AdapterError(
+            f"robotctl health --json was not JSON ({exc}); cannot record a build"
+        ) from exc
+    if not isinstance(payload, dict):
+        raise AdapterError("robotctl health --json must be an object")
+    return payload, "robotctl"

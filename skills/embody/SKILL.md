@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires a joined ACN agent (ACN_API_KEY from POST /agents/join). First body kind needs microduck-plugin / microduck-skill. Optional: EMBODY_HOME, EMBODY_MICRODUCK_SKILL, ACN_BASE_URL, EMBODY_STUDIO_URL."
 metadata:
   author: acnlabs
-  version: "0.1.11"
+  version: "0.1.12"
   homepage: "https://github.com/acnlabs/embody"
   repository: "https://github.com/acnlabs/embody"
   product: embody
@@ -23,7 +23,7 @@ Do not start with `whoami`. `whoami` is this body asking ACN who it is bound to,
 
 Agent already `POST /agents/join`. Export `ACN_API_KEY` (and `ACN_BASE_URL` if not the default). ACN join does not create a body. This machine may already have them in `~/.acn/config.json` (`api_key`, `base_url`) — read that file yourself; Embody does not load it.
 
-v0 create is localhost sim. `--origin robot` (acquire a real unit) is out of this probe.
+v0 create is localhost sim. `--origin robot` **pairs** a unit this kind runtime can probe (`robotctl health --json`). No duck → fail; do not mint a fake body. Session still only starts `origin=sim`.
 
 ```bash
 python3 -m embody body add --kind microduck --origin sim --name duck-1
@@ -124,7 +124,7 @@ Session verbs: [body-runtime-v0.md](../../docs/product/body-runtime-v0.md).
 - Drive or manage a body through ACN or AgentPlanet. Do not store ACN task ids in Embody.
 - Change ACN join / message / task APIs.
 - Debit Credits to own or move a body.
-- Run `robotctl` unless the human owns that robot and asked.
+- Run `robotctl policy add` / SSH unless the human owns that robot and asked. Pairing may run read-only `robotctl health --json`.
 - Treat Microduck as the only kind Embody will ever have. It is the v0 probe.
 - Drive from the hosted owner studio. That page only observes. Local `embody studio` is a debug Show, not the product.
 - POST Show snapshots to AgentPlanet or ACN. `push` goes to `EMBODY_STUDIO_URL` only.
