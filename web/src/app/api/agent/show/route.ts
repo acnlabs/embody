@@ -1,18 +1,29 @@
 import { fetchAgentId } from "@/lib/acn";
+import { asBuild } from "@/lib/build";
 import { getBody, upsertBody } from "@/lib/ledger";
 import { extractBearerToken } from "@/lib/userAuth";
 import type { BodyShow, Card } from "@/lib/types";
 
 export const runtime = "nodejs";
 
-function asShow(raw: unknown): BodyShow | null {
-  if (!raw || typeof raw !== "object") return null;
+function asShow(raw: unknown): { show: BodyShow } | { error: string } {
+  if (!raw || typeof raw !== "object") {
+    return { error: "show needs id, kind, origin, bound_agent_id" };
+  }
   const row = raw as Record<string, unknown>;
   const id = String(row.id ?? "").trim();
   const kind = String(row.kind ?? "").trim();
   const origin = String(row.origin ?? "").trim();
   const bound = String(row.bound_agent_id ?? "").trim();
-  if (!id || !kind || !origin || !bound) return null;
+  if (!id || !kind || !origin || !bound) {
+    return { error: "show needs id, kind, origin, bound_agent_id" };
+  }
+  let build: Record<string, unknown> | undefined;
+  if ("build" in row) {
+    const parsed = asBuild(row.build);
+    if (!parsed.ok) return { error: parsed.error };
+    build = parsed.build;
+  }
   const cards = Array.isArray(row.cards)
     ? row.cards
         .map((item) => {
@@ -30,24 +41,23 @@ function asShow(raw: unknown): BodyShow | null {
         .filter((card): card is Card => card != null)
     : [];
   return {
-    id,
-    name: typeof row.name === "string" ? row.name : id,
-    kind,
-    origin,
-    bound_agent_id: bound,
-    session_running: Boolean(row.session_running),
-    build:
-      row.build && typeof row.build === "object" && !Array.isArray(row.build)
-        ? (row.build as Record<string, unknown>)
-        : undefined,
-    cards,
-    numbers:
-      row.numbers && typeof row.numbers === "object"
-        ? (row.numbers as Record<string, unknown>)
-        : null,
-    numbers_error: typeof row.numbers_error === "string" ? row.numbers_error : undefined,
-    next: typeof row.next === "string" ? row.next : undefined,
-    note: typeof row.note === "string" ? row.note : undefined,
+    show: {
+      id,
+      name: typeof row.name === "string" ? row.name : id,
+      kind,
+      origin,
+      bound_agent_id: bound,
+      session_running: Boolean(row.session_running),
+      build,
+      cards,
+      numbers:
+        row.numbers && typeof row.numbers === "object"
+          ? (row.numbers as Record<string, unknown>)
+          : null,
+      numbers_error: typeof row.numbers_error === "string" ? row.numbers_error : undefined,
+      next: typeof row.next === "string" ? row.next : undefined,
+      note: typeof row.note === "string" ? row.note : undefined,
+    },
   };
 }
 
@@ -67,10 +77,11 @@ export async function POST(req: Request) {
     return Response.json({ ok: false, error: "JSON body required" }, { status: 400 });
   }
   const row = payload as { show?: unknown };
-  const show = asShow(row.show);
-  if (!show) {
-    return Response.json({ ok: false, error: "show needs id, kind, origin, bound_agent_id" }, { status: 400 });
+  const parsed = asShow(row.show);
+  if ("error" in parsed) {
+    return Response.json({ ok: false, error: parsed.error }, { status: 400 });
   }
+  const show = parsed.show;
   if (show.bound_agent_id !== agentId) {
     return Response.json({ ok: false, error: "bound_agent_id does not match this ACN key" }, { status: 403 });
   }

@@ -87,7 +87,7 @@ A body has a `kind` (machine type). Session verbs dispatch to that kind's **runt
 
 Join does not create or attach a body. The agent creates or acquires one first; `origin` is `sim` or `robot` at birth. Same `kind`, not `microduck-sim` / `microduck-real`. `bind` writes body ↔ agent. `whoami` is that body asking ACN. v0 create is `--origin sim` only. See [body-runtime-v0.md](./body-runtime-v0.md).
 
-`kind` says how the machine drives — the control contract (observation/action shape, runtime). It does not say what one particular unit carries. A body also has a `build`: the as-built manifest of this one unit — BOM revision, modules (`camera`, `imu`, …), serial, calibration. Sim bodies take the kind's default build; robot units record theirs at pairing. Two same-kind bodies can differ in build (one has a camera, one does not). v0 records and shows the build; policy hardware-gating on attach is a later seam, not this probe.
+`kind` says how the machine drives — the control contract (observation/action shape, runtime). It does not say what one particular unit carries. A body also has a `build`: the as-built manifest of this one unit — BOM revision, modules (`camera`, `imu`, …), serial, calibration. Sim bodies take the kind's default build; robot units record theirs at pairing. Two same-kind bodies can differ in build (one has a camera, one does not). Join records the birth build on the hosted registry; `push` refreshes it. An empty local manifest is uninitialized and is filled with the kind default. v0 records and shows the build (16KiB cap); policy hardware-gating on attach is a later seam, not this probe.
 
 ## Objects
 

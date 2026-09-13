@@ -452,6 +452,17 @@ pre code { background: none; border: none; padding: 0; }
 
 .build-row + .build-row { border-top: 1px dashed var(--line-strong); }
 
+.build-nested {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.build-nested .build-row { padding: 0.15rem 0 0.15rem 0.4rem; }
+
+.build-nested .build-row + .build-row { border-top: none; }
+
 .build-key {
   font-size: 0.7rem;
   font-weight: 700;

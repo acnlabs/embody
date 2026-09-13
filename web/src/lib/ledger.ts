@@ -76,6 +76,7 @@ export async function upsertBody(show: BodyShow): Promise<BodyShow> {
     ...show,
     joined_at: existing?.joined_at,
     pushed_at: new Date().toISOString(),
+    build: show.build ?? existing?.build,
   };
   if (useKv()) {
     const client = await kv();

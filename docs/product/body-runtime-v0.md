@@ -68,14 +68,14 @@ Datacollect JSONL is not training input unless that runtime says so.
 
 ## Kind runtime
 
-A runtime registers `kind` → adapter id and implements the verbs. v0 table:
+A runtime registers `kind` → adapter id, a `default_build` (the as-built manifest a sim of this kind is born with), and the verbs. Robot units record their own build at pairing instead. v0 table:
 
-| `kind` | Runtime | Notes |
-|---|---|---|
-| `microduck` | microduck-skill | `prepare` → `doctor.sh --clone` then adopt default checkout; `stop` → `control.sh shutdown`; other verbs → `control.sh`; one localhost sim |
-| other slugs | none | Body and cards may exist; session errors |
+| `kind` | Runtime | `default_build` | Notes |
+|---|---|---|---|
+| `microduck` | microduck-skill | `bom=microduck-sim`; modules `imu`, `foot_contact`; no `camera` | `prepare` → `doctor.sh --clone` then adopt default checkout; `stop` → `control.sh shutdown`; other verbs → `control.sh`; one localhost sim |
+| other slugs | none | empty | Body and cards may exist; session errors |
 
-Do not lift into the kernel: observation/action size, PPO, Jobs, `robotctl`, Viser, joint indices, Hub search.
+Do not lift into the kernel: observation/action size, PPO, Jobs, `robotctl`, Viser, joint indices, Hub search. The build is a record; policy hardware-gating on attach is a later seam.
 
 ## Out of this contract
 

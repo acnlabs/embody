@@ -37,15 +37,17 @@ python3 -m embody join --body duck-1
 
 `kind` is a machine type. `origin` is birth: `sim` or `robot`. Same kind, not two bodies. Only `microduck` has a runtime today ([microduck-plugin](https://github.com/acnlabs/microduck-plugin)). Point at it with `EMBODY_MICRODUCK_SKILL` or a sibling clone. Do not export runtime-private paths such as `MICRODUCK_RL_ROOT`.
 
-A body also has a `build`: the as-built manifest of this one unit (BOM revision, `modules` like `camera` / `imu`, serial, calibration). Sim bodies are born with the kind's default build; robot units record theirs at pairing. Two same-kind bodies can differ in build. Pass `--build '{"modules": {"camera": true}}'` at `body add` (merged over the kind default), or edit later:
+A body also has a `build`: the as-built manifest of this one unit (BOM revision, `modules` like `camera` / `imu`, serial, calibration). Sim bodies are born with the kind's default build; robot units record theirs at pairing. Two same-kind bodies can differ in build. An empty ledger entry is uninitialized and is filled with the kind default on load. Pass `--build '{"modules": {"camera": true}}'` at `body add` (merged over the kind default), or edit later:
 
 ```bash
 python3 -m embody body build --body duck-1                          # show
 python3 -m embody body build --body duck-1 --set modules.camera=true --set serial=MD-0001
+python3 -m embody body build --body duck-1 --set modules.camera=True  # Python True/False also work
 python3 -m embody body build --body duck-1 --unset modules.camera
+python3 -m embody body build --body duck-1 --replace '{}'            # reset to the kind default
 ```
 
-`push` carries the build; the hosted room renders it as 配置.
+`body add` / `join` send the birth build to the hosted registry so the room can show 配置 before the first `push`. `push` refreshes it. Cap is 16KiB. Nested keys (calibration) render as rows, not a JSON blob.
 
 ## 2. Bind, then this body asks ACN
 

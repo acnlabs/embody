@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import json
 import re
 from typing import Any
 
@@ -32,11 +33,32 @@ def adapter_id_for(kind: str) -> str:
     return runtime.adapter_id if runtime is not None else "none"
 
 
+MAX_BUILD_BYTES = 16 * 1024
+
+
 def default_build_for(kind: str) -> dict[str, Any]:
     runtime = _RUNTIMES.get(kind)
     if runtime is None:
         return {}
     return copy.deepcopy(runtime.default_build)
+
+
+def fill_build(body: Body) -> bool:
+    """Empty manifest means uninitialized. Fill the kind default. True if written."""
+    if body.build:
+        return False
+    filled = default_build_for(body.kind)
+    if not filled:
+        return False
+    body.build = filled
+    return True
+
+
+def assert_build_size(build: dict[str, Any]) -> dict[str, Any]:
+    raw = json.dumps(build, ensure_ascii=False).encode("utf-8")
+    if len(raw) > MAX_BUILD_BYTES:
+        raise BodyRuntimeError(f"build exceeds {MAX_BUILD_BYTES} bytes")
+    return build
 
 
 def get_runtime(kind: str) -> BodyRuntime | None:

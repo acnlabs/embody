@@ -229,6 +229,7 @@ def test_v1_state_migrates(home: Path) -> None:
     assert state.bodies[0].policy_by_alias("walk") is not None
     assert state.bodies[0].origin == "sim"
     assert state.bodies[0].bound_agent_id == "agent-1"
+    assert state.bodies[0].build["bom"] == "microduck-sim"
     save(state)
     again = State.from_dict(json.loads(path.read_text(encoding="utf-8")))
     assert again.agent is not None
@@ -536,7 +537,11 @@ def test_body_add_joins_hosted_when_studio_set(
         assert out["room"] == "/b/body_aaaa11112222"
         join_req = stub.requests[0]
         assert join_req["path"] == "/api/agent/bodies"
-        assert join_req["body"] == {"kind": "microduck", "origin": "sim", "name": "duck-9"}
+        assert join_req["body"]["kind"] == "microduck"
+        assert join_req["body"]["origin"] == "sim"
+        assert join_req["body"]["name"] == "duck-9"
+        assert join_req["body"]["build"]["bom"] == "microduck-sim"
+        assert join_req["body"]["build"]["modules"]["camera"] is False
         assert "id" not in join_req["body"]
     finally:
         stub.close()
@@ -610,6 +615,15 @@ def test_body_build_set_unset_replace(home: Path, capsys: pytest.CaptureFixture[
     out = json.loads(capsys.readouterr().out)
     assert out["build"] == {"bom": "bare"}
 
+    assert main(["body", "build", "--body", "duck-1", "--set", "modules.camera=True"]) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out["build"]["modules"]["camera"] is True
+
+    assert main(["body", "build", "--body", "duck-1", "--replace", "{}"]) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out["build"]["bom"] == "microduck-sim"
+    assert out["build"]["modules"]["imu"] is True
+
     assert main(["body", "build", "--body", "duck-1", "--set", "bad-item"]) == 1
 
 
@@ -638,3 +652,25 @@ def test_push_carries_build(
 def test_unknown_kind_has_empty_default_build(home: Path) -> None:
     assert main(["body", "add", "--kind", "unitree-g1", "--origin", "sim"]) == 0
     assert load().bodies[0].build == {}
+
+
+def test_load_backfills_missing_and_empty_build(home: Path) -> None:
+    add_sim("duck-1")
+    path = state_path()
+    data = json.loads(path.read_text(encoding="utf-8"))
+    del data["bodies"][0]["build"]
+    path.write_text(json.dumps(data), encoding="utf-8")
+    assert load().bodies[0].build["bom"] == "microduck-sim"
+    on_disk = json.loads(path.read_text(encoding="utf-8"))
+    assert on_disk["bodies"][0]["build"]["modules"]["imu"] is True
+
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["bodies"][0]["build"] = {}
+    path.write_text(json.dumps(data), encoding="utf-8")
+    assert load().bodies[0].build["modules"]["camera"] is False
+
+
+def test_body_add_build_rejects_too_large(home: Path) -> None:
+    huge = json.dumps({"pad": "x" * 20000})
+    assert main(["body", "add", "--origin", "sim", "--build", huge]) == 1
+    assert load().bodies == []

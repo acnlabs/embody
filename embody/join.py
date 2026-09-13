@@ -32,6 +32,7 @@ def join_body(
     kind: str,
     origin: str,
     local_id: str | None = None,
+    build: dict[str, Any] | None = None,
     timeout: float = 15.0,
 ) -> dict[str, Any]:
     key = api_key()
@@ -42,6 +43,8 @@ def join_body(
         payload["name"] = name
     if local_id:
         payload["id"] = local_id
+    if build:
+        payload["build"] = build
     req = urllib.request.Request(
         f"{_studio_url()}{JOIN_PATH}",
         data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),

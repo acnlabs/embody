@@ -1,5 +1,6 @@
 import { randomBytes } from "crypto";
 import { fetchAgentId } from "@/lib/acn";
+import { asBuild } from "@/lib/build";
 import { registerBody } from "@/lib/ledger";
 import { extractBearerToken } from "@/lib/userAuth";
 import type { BodyShow } from "@/lib/types";
@@ -54,6 +55,13 @@ export async function POST(req: Request) {
     cards: [],
     numbers: null,
   };
+  if ("build" in row) {
+    const parsed = asBuild(row.build);
+    if (!parsed.ok) {
+      return Response.json({ ok: false, error: parsed.error }, { status: 400 });
+    }
+    record.build = parsed.build;
+  }
   const stored = await registerBody(record);
   if (!stored) {
     return Response.json({ ok: false, error: `body id ${id} is already registered` }, { status: 409 });

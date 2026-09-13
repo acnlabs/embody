@@ -9,7 +9,9 @@ from embody.acn import AcnError, acn_base_url, api_key, fetch_me
 from embody.adapters import (
     AdapterError,
     adapter_id_for,
+    assert_build_size,
     default_build_for,
+    fill_build,
     guard_concurrency,
     run as run_adapter,
     validate_kind,
@@ -171,7 +173,10 @@ def _parse_build_json(raw: str) -> dict[str, Any]:
         raise CliError(f"--build / --replace takes a JSON object: {exc}") from exc
     if not isinstance(parsed, dict):
         raise CliError("build must be a JSON object, e.g. '{\"modules\": {\"camera\": true}}'")
-    return parsed
+    try:
+        return assert_build_size(parsed)
+    except AdapterError as exc:
+        raise CliError(str(exc)) from exc
 
 
 def _merge_build(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:
@@ -211,6 +216,8 @@ def _unset_dot_path(build: dict[str, Any], path: str) -> None:
 
 
 def _parse_set_value(raw: str) -> Any:
+    if raw in {"True", "False"}:
+        return raw == "True"
     try:
         return json.loads(raw)
     except json.JSONDecodeError:
@@ -229,9 +236,13 @@ def cmd_body_add(args: argparse.Namespace) -> int:
     build = default_build_for(kind)
     if args.build:
         build = _merge_build(build, _parse_build_json(args.build))
+        try:
+            assert_build_size(build)
+        except AdapterError as exc:
+            raise CliError(str(exc)) from exc
     joined: dict[str, Any] | None = None
     if studio_configured():
-        joined = join_body(name=name, kind=kind, origin=origin)
+        joined = join_body(name=name, kind=kind, origin=origin, build=build)
         local_id = str(joined["body"]["id"])
     else:
         local_id = new_id("body")
@@ -277,7 +288,13 @@ def cmd_body_add(args: argparse.Namespace) -> int:
 def cmd_join(args: argparse.Namespace) -> int:
     state = load()
     body = _resolve_body(state, args.body, need_bound=False)
-    remote = join_body(name=body.name, kind=body.kind, origin=body.origin, local_id=body.id)
+    remote = join_body(
+        name=body.name,
+        kind=body.kind,
+        origin=body.origin,
+        local_id=body.id,
+        build=body.build,
+    )
     return _dump(
         {
             "ok": True,
@@ -321,6 +338,12 @@ def cmd_body_build(args: argparse.Namespace) -> int:
     for key in args.unset or []:
         _unset_dot_path(body.build, key.strip())
         changed = True
+    if fill_build(body):
+        changed = True
+    try:
+        assert_build_size(body.build)
+    except AdapterError as exc:
+        raise CliError(str(exc)) from exc
     if changed:
         save(state)
     return _dump(

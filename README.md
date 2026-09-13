@@ -19,7 +19,7 @@ microduck-plugin   first runtime — v0 probe, not the platform
 
 A joined ACN agent can have many bodies. Each body has a `kind`. Session goes to that kind's runtime. v0 drives Microduck sim; other kinds can be recorded. The Microduck runtime runs one localhost sim at a time.
 
-`kind` is the control contract; `build` is this one unit's as-built manifest (BOM, `modules` like `camera` / `imu`, serial, calibration). Sim bodies are born with the kind default; robot units record theirs at pairing. Edit with `body build --set modules.camera=true`; `push` carries it and the hosted room renders it as 配置.
+`kind` is the control contract; `build` is this one unit's as-built manifest (BOM, `modules` like `camera` / `imu`, serial, calibration). Sim bodies are born with the kind default; robot units record theirs at pairing. Edit with `body build --set modules.camera=true`. Join records the birth build on the hosted registry; `push` refreshes it and the room renders 配置.
 
 ACN join does not create a body. With `EMBODY_STUDIO_URL` set, `body add --origin sim` first **joins the hosted studio** — the registry mints the body id — then instantiates it locally (without the URL the id is local-only until `embody join` adopts it; robot pair is out of this probe). Then `bind`, then `whoami`. The agent finds the Hub card; `policy attach` stores a pointer. `show` / `status` expose cards and live numbers; `push` updates a joined body on the **hosted** owner studio (`web/`). The agent replies on ACN. The web page does not drive. Local `embody studio` is a debug Show, not the product. A second kind and a train CLI stay out of this probe.
 

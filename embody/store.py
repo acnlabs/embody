@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 
+from embody.adapters import fill_build
 from embody.models import State
 
 
@@ -25,7 +26,10 @@ def load(home: Path | None = None) -> State:
     data = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(data, dict):
         raise ValueError(f"corrupt embody state: {path}")
-    return State.from_dict(data)
+    state = State.from_dict(data)
+    if any(fill_build(body) for body in state.bodies):
+        save(state, home)
+    return state
 
 
 def save(state: State, home: Path | None = None) -> Path:

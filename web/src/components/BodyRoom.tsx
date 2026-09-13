@@ -98,8 +98,32 @@ function Telemetry({ body }: { body: BodyShow }) {
 function buildVal(v: unknown): string {
   if (typeof v === "boolean") return v ? "有" : "无";
   if (v == null) return "—";
-  if (typeof v === "object") return JSON.stringify(v);
   return String(v);
+}
+
+function BuildValue({ value }: { value: unknown }) {
+  if (Array.isArray(value)) {
+    return (
+      <span className="build-val">
+        {value.length ? value.map((item) => buildVal(item)).join(", ") : "—"}
+      </span>
+    );
+  }
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>);
+    if (!entries.length) return <span className="build-val">—</span>;
+    return (
+      <div className="build-nested">
+        {entries.map(([key, nested]) => (
+          <div className="build-row" key={key}>
+            <span className="build-key">{key}</span>
+            <BuildValue value={nested} />
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return <span className="build-val">{buildVal(value)}</span>;
 }
 
 function BuildSection({ build }: { build: Record<string, unknown> }) {
@@ -116,7 +140,7 @@ function BuildSection({ build }: { build: Record<string, unknown> }) {
         {extras.map(([key, value]) => (
           <div className="build-row" key={key}>
             <span className="build-key">{key}</span>
-            <span className="build-val">{buildVal(value)}</span>
+            <BuildValue value={value} />
           </div>
         ))}
         {moduleEntries.length ? (
