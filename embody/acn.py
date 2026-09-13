@@ -30,7 +30,12 @@ def fetch_me(timeout: float = 15.0) -> dict[str, Any]:
     url = f"{acn_base_url()}/api/v1/agents/me"
     req = urllib.request.Request(
         url,
-        headers={"Authorization": f"Bearer {key}", "Accept": "application/json"},
+        headers={
+            "Authorization": f"Bearer {key}",
+            "Accept": "application/json",
+            # Cloudflare bans the default python-urllib signature (error 1010).
+            "User-Agent": "embody-cli/0.1",
+        },
         method="GET",
     )
     try:
