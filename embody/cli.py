@@ -32,7 +32,7 @@ from embody.models import (
     validate_origin,
 )
 from embody.join import JoinError, join_body, studio_configured
-from embody.push import PushError, post_show, push_document
+from embody.push import PushError, post_show, push_document, transient_push_error
 from embody.show import body_card, live_show, public_runtime_error, show_for
 from embody.studio import DEFAULT_BIND, DEFAULT_PORT, serve as serve_studio
 from embody.store import load, save
@@ -628,6 +628,7 @@ def cmd_push_watch(args: argparse.Namespace) -> int:
             }
         )
     ticks = 0
+    retries = 0
     try:
         while True:
             state = load()
@@ -637,7 +638,20 @@ def cmd_push_watch(args: argparse.Namespace) -> int:
             try:
                 remote = post_show(document)
             except PushError as exc:
-                raise CliError(str(exc)) from exc
+                if not transient_push_error(exc):
+                    raise CliError(str(exc)) from exc
+                retries += 1
+                _dump(
+                    {
+                        "ok": False,
+                        "watch": True,
+                        "retry": retries,
+                        "error": "hosted studio unreachable; retrying",
+                    }
+                )
+                time.sleep(interval)
+                continue
+            retries = 0
             ticks += 1
             _dump(
                 {

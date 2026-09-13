@@ -17,6 +17,20 @@ class PushError(RuntimeError):
     pass
 
 
+def transient_push_error(exc: BaseException) -> bool:
+    """SSL / proxy / 5xx blips. Auth and unknown body stay fatal."""
+    text = str(exc).lower()
+    if "acn_api_key is required" in text or "embody_studio_url is required" in text:
+        return False
+    if any(f"push failed ({code})" in text for code in ("401", "403", "404", "400")):
+        return False
+    if "unreachable" in text or "ssl" in text or "eof" in text or "timed out" in text:
+        return True
+    if any(f"push failed ({code})" in text for code in ("429", "500", "502", "503", "504")):
+        return True
+    return False
+
+
 def studio_url() -> str:
     raw = (os.environ.get("EMBODY_STUDIO_URL") or "").strip().rstrip("/")
     if not raw:

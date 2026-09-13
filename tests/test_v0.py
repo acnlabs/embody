@@ -10,6 +10,7 @@ from embody import adapter_microduck
 from embody.adapters import get_runtime
 from embody.cli import main
 from embody.models import Session, State, asset_ref, hub_resolve
+from embody.push import PushError, transient_push_error
 from embody.show import lift_runtime_numbers, public_runtime_error
 from embody.store import load, save, state_path
 
@@ -769,3 +770,74 @@ def test_push_watch_stops_when_session_ends(
         assert shows[1]["body"]["show"]["session_running"] is False
     finally:
         stub.close()
+
+
+def test_transient_push_error_classifies() -> None:
+    assert transient_push_error(PushError("embody web unreachable: [SSL: UNEXPECTED_EOF_WHILE_READING]"))
+    assert transient_push_error(PushError("embody web push failed (503): oops"))
+    assert not transient_push_error(PushError("embody web push failed (401): ACN bearer required"))
+    assert not transient_push_error(PushError("ACN_API_KEY is required to push (hosted studio checks /agents/me)"))
+
+
+def test_push_watch_retries_ssl_then_succeeds(
+    home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    add_sim("duck-1")
+    bind_offline()
+    _mark_running()
+    hits = {"n": 0}
+
+    def fake_document(body):
+        return {
+            "ok": True,
+            "show": {
+                "id": body.id,
+                "name": body.name,
+                "kind": body.kind,
+                "origin": body.origin,
+                "bound_agent_id": body.bound_agent_id,
+                "session_running": body.session is not None,
+            },
+        }
+
+    def fake_post(_document):
+        hits["n"] += 1
+        if hits["n"] == 1:
+            raise PushError("embody web unreachable: [SSL: UNEXPECTED_EOF_WHILE_READING] EOF")
+        return {"ok": True, "room": "/b/body_test"}
+
+    def fake_sleep(_seconds: float) -> None:
+        if hits["n"] >= 2:
+            state = load()
+            state.bodies[0].session = None
+            save(state)
+
+    monkeypatch.setattr("embody.cli.push_document", fake_document)
+    monkeypatch.setattr("embody.cli.post_show", fake_post)
+    monkeypatch.setattr("embody.cli.time.sleep", fake_sleep)
+    capsys.readouterr()
+    assert main(["push", "--watch", "--body", "duck-1", "--interval", "0.01"]) == 0
+    out = capsys.readouterr().out
+    assert "hosted studio unreachable; retrying" in out
+    assert hits["n"] == 3
+
+
+def test_push_watch_401_does_not_retry(
+    home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    add_sim("duck-1")
+    bind_offline()
+    _mark_running()
+    sleeps: list[float] = []
+
+    def fake_document(body):
+        return {"ok": True, "show": {"id": body.id}}
+
+    def fake_post(_document):
+        raise PushError("embody web push failed (401): ACN bearer required")
+
+    monkeypatch.setattr("embody.cli.push_document", fake_document)
+    monkeypatch.setattr("embody.cli.post_show", fake_post)
+    monkeypatch.setattr("embody.cli.time.sleep", sleeps.append)
+    assert main(["push", "--watch", "--body", "duck-1"]) == 1
+    assert sleeps == []

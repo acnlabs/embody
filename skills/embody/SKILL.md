@@ -99,7 +99,7 @@ python3 -m embody session status
 
 `show.cards` is Hub preview + onnx. `show.origin` is birth. `show.numbers` is whatever the kind runtime printed. If the sim is down, `show` still prints cards and puts the error in `numbers_error`. Say the numbers. Do not invent `fallen`. Do not POST them to ACN through Embody — you write the ACN message yourself.
 
-To let the owner see this body on the hosted studio, set `EMBODY_STUDIO_URL` and push. That POST is Embody web, not AgentPlanet, not ACN. Push only updates a **joined** body — an unknown id is refused (`404`); join first. While a session is running, `push --watch` repeats the snapshot until the session ends or you Ctrl+C (that stops watching, not the sim).
+While a session is running, `push --watch` repeats the snapshot until the session ends or you Ctrl+C (that stops watching, not the sim). Transient hosted-studio errors (SSL / proxy EOF) retry; 401/404 do not.
 
 ```bash
 python3 -m embody push --body duck-1
