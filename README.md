@@ -12,7 +12,7 @@ Not a robot. Not an SDK. The workplace where a joined ACN agent gets a body, tra
 ACN                identity / messages / tasks / wallet — collaboration, not a body remote
 AgentPlanet        launch / Credits / embed / Store — not the body ledger
 embody CLI         this machine: acquire / bind / train / manage / control
-embody web         hosted owner studio — observe, and drive when push --watch is listening
+embody web         hosted owner studio — observe, and drive after the agent starts a session
 kind runtime       how this machine type trains and moves
 microduck-plugin   first runtime — v0 probe, not the platform
 ```
@@ -21,7 +21,7 @@ A joined ACN agent can have many bodies. Each body has a `kind`. Session goes to
 
 `kind` is the control contract; `build` is this one unit's as-built manifest (BOM, evidenced `modules` like `imu` / `foot_contact`, serial, calibration). A Microduck sim is born with that kind default — official policy obs is 61-dim proprioception + commands, so sim origin cannot declare a camera. Robot units record a front camera at pairing if the unit has one. Join records the birth build on the hosted registry; `push` refreshes it and the room renders 配置.
 
-ACN join does not create a body. With `EMBODY_STUDIO_URL` set, `body add --origin sim` first **joins the hosted studio** — the registry mints the body id — then instantiates it locally (without the URL the id is local-only until `embody join` adopts it). `--origin robot` probes a reachable unit (`robotctl health --json`) and records that build; no duck → fail. Session still only starts sim. Then `bind`, then `whoami`. The agent finds the Hub card; `policy attach` stores a pointer. `show` / `status` expose cards and live numbers; `push` updates a joined body on the **hosted** owner studio (`web/`). The agent replies on ACN. The web page can walk / turn / fire tricks while `push --watch` is running; last write wins with the agent. Local `embody studio` is a debug Show, not the product. A second kind and a train CLI stay out of this probe.
+ACN join does not create a body. With `EMBODY_STUDIO_URL` set, `body add --origin sim` first **joins the hosted studio** — the registry mints the body id — then instantiates it locally (without the URL the id is local-only until `embody join` adopts it). `--origin robot` probes a reachable unit (`robotctl health --json`) and records that build; no duck → fail. Session still only starts sim. Then `bind`, then `whoami`. The agent finds the Hub card; `policy attach` stores a pointer. `show` / `status` expose cards and live numbers; `push` updates a joined body on the **hosted** owner studio (`web/`). The agent replies on ACN. `session start` lights the owner room (detached watch); last write wins with the page. Local `embody studio` is a debug Show, not the product. A second kind and a train CLI stay out of this probe.
 
 ## Install
 
@@ -41,7 +41,6 @@ python3 -m embody bind --body duck-1
 python3 -m embody whoami --body duck-1
 python3 -m embody policy attach --body duck-1 --hub neil-jo/microduck-walk --as walk
 python3 -m embody session start --body duck-1
-python3 -m embody push --watch --body duck-1
 python3 -m embody status
 # a body born without EMBODY_STUDIO_URL: python3 -m embody join --body duck-1
 ```

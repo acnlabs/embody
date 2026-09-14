@@ -100,7 +100,6 @@ export default function DrivePad({
 }) {
   const [err, setErr] = useState("");
   const armed = Boolean(body.session_running && body.drive_listening);
-  const name = body.name || body.id;
   const episodic = (body.cards || []).filter((card) => card.mode === "episodic");
   const sendRef = useRef(send);
   sendRef.current = send;
@@ -158,9 +157,9 @@ export default function DrivePad({
 
   let hint = "";
   if (!body.session_running) {
-    hint = `先在本机 session start，再 python3 -m embody push --watch --body ${name}`;
+    hint = "等 agent 接通这场";
   } else if (!body.drive_listening) {
-    hint = `本机 python3 -m embody push --watch --body ${name} 之后才能从这里开`;
+    hint = "agent 正在接通这间房…";
   }
 
   return (

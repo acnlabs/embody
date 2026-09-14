@@ -27,7 +27,7 @@ function num(v: unknown, digits: number): string {
 
 function shortNumbersError(raw: string): string {
   if (/Traceback|Connection refused|Errno 61/i.test(raw)) {
-    return "本机仿真连不上（127.0.0.1:8765）。session start 后再 push。";
+    return "本机仿真连不上。等 agent 再开一场。";
   }
   return raw.length > 240 ? `${raw.slice(0, 240)}…` : raw;
 }
@@ -64,7 +64,7 @@ function Telemetry({ body }: { body: BodyShow }) {
         <div className="stat">
           <div className="label">遥测</div>
           <p className="sub" style={{ marginTop: "0.4rem" }}>
-            还没有实时数字。session start 并 push --watch 后，这里跟快照。
+            还没有实时数字。等 agent 接通这场。
           </p>
         </div>
       </div>
@@ -177,7 +177,7 @@ function BuildSection({ build }: { build: Record<string, unknown> }) {
 function stageCaption(body: BodyShow, hasJoints: boolean): string {
   if (body.numbers_error) return "仿真在本机 · 这次没读到关节";
   if (!hasJoints) {
-    return body.session_running ? "仿真在本机 · 等待关节流" : "仿真在本机";
+    return body.session_running ? "等 agent 接通关节" : "仿真在本机";
   }
   if (body.drive_listening) return "仿真在本机 · WASD 开车 · 拖动转视角";
   return "仿真在本机 · 人开 · agent 也能开";
@@ -247,7 +247,6 @@ export function RoomView({
             agent <code>{body.bound_agent_id}</code>
           </span>
           <span>push {fmtAgo(body.pushed_at)}</span>
-          {body.next ? <span>下一步 {body.next}</span> : null}
         </div>
       </header>
 
@@ -271,7 +270,6 @@ export function RoomView({
       ) : (
         <p className="meta">还没有卡。agent 在本机 attach 技能后再 push。</p>
       )}
-      {body.note ? <p className="meta">{body.note}</p> : null}
     </>
   );
 }

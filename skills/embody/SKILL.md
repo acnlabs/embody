@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires a joined ACN agent (ACN_API_KEY from POST /agents/join). First body kind needs microduck-plugin / microduck-skill. Optional: EMBODY_HOME, EMBODY_MICRODUCK_SKILL, ACN_BASE_URL, EMBODY_STUDIO_URL."
 metadata:
   author: acnlabs
-  version: "0.1.14"
+  version: "0.1.15"
   homepage: "https://github.com/acnlabs/embody"
   repository: "https://github.com/acnlabs/embody"
   product: embody
@@ -83,7 +83,7 @@ Preview is on the model card. A raw `/resolve/main/preview.mp4` click downloads.
 
 `session start` calls `prepare` first. Walk is perpetual. Bow is episodic — `do`, never start that repo. v0 only drives `origin=sim`.
 
-You drive. The hosted page can also walk / turn / fire tricks while `push --watch` is listening; last write wins. After `start` / `do` / `twist` / `halt` / `stop`, if `EMBODY_STUDIO_URL` is set, the CLI **pushes** the Show so the owner room updates. `push --watch` keeps walking numbers live and runs the owner inbox (~0.2s).
+You drive. `session start` detaches `push --watch` so the hosted owner room lights and can walk / turn / fire tricks; last write wins. Do not run a second `push --watch` unless that watch died. After `start` / `do` / `twist` / `halt` / `stop`, if `EMBODY_STUDIO_URL` is set, the CLI **pushes** the Show so the owner room updates. The start-spawned watch keeps walking numbers live (~5 Hz pose) and runs the owner inbox (~0.2s). `session stop` ends the watch with the sim.
 
 ```bash
 python3 -m embody session start --body duck-1
@@ -105,7 +105,7 @@ python3 -m embody session status
 
 `show.cards` is Hub preview + onnx. `show.origin` is birth. `show.numbers` is whatever the kind runtime printed. If the sim is down, `show` still prints cards and puts the error in `numbers_error`. Say the numbers. Do not invent `fallen`. Do not POST them to ACN through Embody — you write the ACN message yourself.
 
-While a session is running, `push --watch` repeats the snapshot until the session ends or you Ctrl+C (that stops watching, not the sim). It also polls the owner drive inbox and posts a joint pose ~5 Hz so the room can follow. The page uses WASD (space to halt); dragging the canvas only orbits. Transient hosted-studio errors (SSL / proxy EOF / timeout) retry; 401/404 do not. Prefer watch for a long walk; `session do` already pushes the trick.
+While a session is running, the start-spawned watch repeats the snapshot until `session stop` (or the watch process dies). It polls the owner drive inbox and posts a joint pose ~5 Hz so the room can follow. The page uses WASD (space to halt); dragging the canvas only orbits. Transient hosted-studio errors (SSL / proxy EOF / timeout) retry; 401/404 do not. `session do` already pushes the trick. Recover a dead watch with:
 
 ```bash
 python3 -m embody push --body duck-1
@@ -128,5 +128,5 @@ Session verbs: [body-runtime-v0.md](../../docs/product/body-runtime-v0.md).
 - Debit Credits to own or move a body.
 - Run `robotctl policy add` / SSH unless the human owns that robot and asked. Pairing may run read-only `robotctl health --json`.
 - Treat Microduck as the only kind Embody will ever have. It is the v0 probe.
-- Drive from the hosted owner studio unless `push --watch` is running on this machine. Local `embody studio` is a debug Show, not the product.
+- Drive from the hosted owner studio before `session start` on this machine. Local `embody studio` is a debug Show, not the product.
 - POST Show snapshots to AgentPlanet or ACN. `push` goes to `EMBODY_STUDIO_URL` only.

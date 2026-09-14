@@ -87,17 +87,26 @@ class Session:
     started_at: str
     adapter: str
     start_hub: str | None = None
+    watch_pid: int | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Session:
+        raw_pid = data.get("watch_pid")
+        watch_pid: int | None = None
+        if raw_pid is not None and str(raw_pid).strip() != "":
+            try:
+                watch_pid = int(raw_pid)
+            except (TypeError, ValueError):
+                watch_pid = None
         return cls(
             id=str(data["id"]),
             started_at=str(data["started_at"]),
             adapter=str(data["adapter"]),
             start_hub=data.get("start_hub"),
+            watch_pid=watch_pid,
         )
 
 

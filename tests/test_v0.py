@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -402,6 +403,8 @@ def test_session_do_pushes_owner_show(
     try:
         monkeypatch.setenv("EMBODY_STUDIO_URL", stub.url)
         monkeypatch.setenv("ACN_API_KEY", "acn_test")
+        monkeypatch.setattr("embody.cli.spawn_watch", lambda body: 4242)
+        monkeypatch.setattr("embody.cli.stop_watch", lambda pid: None)
         capsys.readouterr()
         assert main(["join", "--body", "duck-1"]) == 0
         assert main(["session", "start", "--body", "duck-1"]) == 0
@@ -906,6 +909,100 @@ def _mark_running(name: str = "duck-1") -> None:
         adapter="microduck-skill",
     )
     save(state)
+
+
+def test_session_start_spawns_watch(
+    home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _mock_skill(tmp_path, monkeypatch)
+    add_sim("duck-1")
+    bind_offline()
+    run(["policy", "attach", "--hub", "neil-jo/microduck-walk", "--as", "walk"])
+    spawned: list[str] = []
+    stopped: list[int | None] = []
+    monkeypatch.setattr(
+        "embody.cli.spawn_watch", lambda body: spawned.append(body.id) or 4242
+    )
+    monkeypatch.setattr("embody.cli.stop_watch", lambda pid: stopped.append(pid))
+    stub = RegistryStub()
+    try:
+        monkeypatch.setenv("EMBODY_STUDIO_URL", stub.url)
+        monkeypatch.setenv("ACN_API_KEY", "acn_test")
+        capsys.readouterr()
+        assert main(["join", "--body", "duck-1"]) == 0
+        capsys.readouterr()
+        assert main(["session", "start", "--body", "duck-1"]) == 0
+        out = json.loads(capsys.readouterr().out)
+        assert out["watch"] == {"ok": True, "pid": 4242}
+        assert "Owner room is live" in out["note"]
+        body = load().bodies[0]
+        assert body.session is not None
+        assert body.session.watch_pid == 4242
+        assert spawned == [body.id]
+        capsys.readouterr()
+        assert main(["session", "stop", "--body", "duck-1"]) == 0
+        assert 4242 in stopped
+        assert load().bodies[0].session is None
+    finally:
+        stub.close()
+
+
+def test_session_start_skips_watch_without_studio(
+    home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _mock_skill(tmp_path, monkeypatch)
+    add_sim("duck-1")
+    bind_offline()
+    run(["policy", "attach", "--hub", "neil-jo/microduck-walk", "--as", "walk"])
+
+    def boom(_body: object) -> int:
+        raise AssertionError("must not spawn watch without EMBODY_STUDIO_URL")
+
+    monkeypatch.setattr("embody.cli.spawn_watch", boom)
+    capsys.readouterr()
+    assert main(["session", "start", "--body", "duck-1"]) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out["watch"]["skipped"]
+    assert load().bodies[0].session is not None
+    assert load().bodies[0].session.watch_pid is None
+
+
+def test_push_watch_refuses_second_alive_watch(
+    home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _mock_skill(tmp_path, monkeypatch)
+    add_sim("duck-1")
+    bind_offline()
+    run(["policy", "attach", "--hub", "neil-jo/microduck-walk", "--as", "walk"])
+    _mark_running()
+    proc = subprocess.Popen(["sleep", "30"], start_new_session=True)
+    try:
+        state = load()
+        assert state.bodies[0].session is not None
+        state.bodies[0].session.watch_pid = proc.pid
+        save(state)
+        capsys.readouterr()
+        assert main(["push", "--watch", "--body", "duck-1"]) == 1
+        err = json.loads(capsys.readouterr().err)
+        assert "already running" in err["error"]
+    finally:
+        proc.kill()
+        proc.wait()
+
+
+def test_stop_watch_kills_process_group() -> None:
+    from embody.watch import stop_watch, watch_alive
+
+    proc = subprocess.Popen(["sleep", "30"], start_new_session=True)
+    try:
+        assert watch_alive(proc.pid)
+        stop_watch(proc.pid)
+        proc.wait(timeout=2)
+        assert not watch_alive(proc.pid)
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+            proc.wait()
 
 
 def test_push_watch_refuses_without_session(home: Path) -> None:

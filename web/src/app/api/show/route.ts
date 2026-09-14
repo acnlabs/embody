@@ -22,7 +22,7 @@ export async function GET(req: Request) {
     owner: sub,
     agents: mine,
     show,
-    note: "Owner rooms. Drive with the agent when push --watch is listening. Embody does not store task ids.",
+    note: "Owner rooms. The agent starts a session; you can drive too. Embody does not store task ids.",
   });
 }
 

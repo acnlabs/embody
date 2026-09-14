@@ -109,7 +109,7 @@ Policy preview: `https://huggingface.co/{repo}/resolve/main/preview.mp4`. A raw 
 | Train | Studio verb; the kind runtime trains (no generic PPO in the kernel) | Runtime only. No `train` in this kernel. |
 | Manage | Many bodies, many cards, venues | `body` / `policy` list, attach |
 | Control | Session on the body's origin | `prepare` / `start` / `pull` / `do` / `twist` / `halt` / `status` / `stop` (v0: `origin=sim`) |
-| Show | Card + numbers | CLI `show` / `status`. Agent `push`es a snapshot to hosted owner studio (`web/`). `push --watch` keeps pushing, streams pose ~5 Hz, and runs owner-page `twist` / `do` / `halt` (WASD or pad; last write wins). Canvas drag only orbits. The page cannot reach localhost sim. Hub preview + onnx; live `numbers` pass through. No fallen verdict. Agent replies on ACN. Local `embody studio` is debug only. |
+| Show | Card + numbers | CLI `show` / `status`. Agent `push`es a snapshot to hosted owner studio (`web/`). `session start` detaches `push --watch`: live numbers, pose ~5 Hz, and owner-page `twist` / `do` / `halt` (WASD or pad; last write wins). Canvas drag only orbits. The page cannot reach localhost sim. Hub preview + onnx; live `numbers` pass through. No fallen verdict. Agent replies on ACN. Local `embody studio` is debug only. |
 
 Datacollect and real-robot lines stay in the kind runtime. Real-robot commands print by default. JSONL does not enter official PPO.
 
@@ -137,7 +137,7 @@ Out of this probe: Jobs training CLI, real-robot **session**, Credits, a second 
 | ACN | Identity, tasks, collaboration with the **agent**. Optional later: a public nameplate. | Session verbs. Joint commands. Own the workplace ledger. Talk to the body. |
 | AgentPlanet | Launch / Credits / embed / Store. Owner identity: `my-agents`. | Body title. Body remote. Charge `source=embody`. Receive body POSTs. |
 | embody CLI | Create / bind / drive on this machine. `push` a Show snapshot to Embody web. | Call ACN about tasks. Store task ids. Search Hub. Bind the laptop instead of the body. POST the AgentPlanet registry. |
-| embody web | Hosted owner rooms. Mint body ids (`join`). Auth0 (same tenant as ComicLaw). Accept agent `push`. Enqueue `twist` / `do` / `halt` for `push --watch` to run. | Talk to localhost sim. Hub search. Credits. Interfaze (until embed_hosts). Localhost-as-product. |
+| embody web | Hosted owner rooms. Mint body ids (`join`). Auth0 (same tenant as ComicLaw). Accept agent `push`. Enqueue `twist` / `do` / `halt` for the session watch to run. | Talk to localhost sim. Hub search. Credits. Interfaze (until embed_hosts). Localhost-as-product. |
 | kind runtime | Train and move this machine type. | Become the platform. Rank Hub cards for the workplace. |
 
 `registry print` dumps the **local** ledger. It does not POST. `push` writes to **Embody web**, not AgentPlanet.

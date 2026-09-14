@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 from typing import Any
@@ -38,6 +39,7 @@ from embody.push import PushError, post_pose, post_show, push_document, take_inb
 from embody.show import body_card, live_show, public_runtime_error, show_for
 from embody.studio import DEFAULT_BIND, DEFAULT_PORT, serve as serve_studio
 from embody.store import load, save
+from embody.watch import spawn_watch, stop_watch, watch_alive
 
 
 class CliError(RuntimeError):
@@ -486,6 +488,19 @@ def cmd_session_prepare(args: argparse.Namespace) -> int:
     return _dump({"ok": True, "body": body.name or body.id, "adapter": adapter})
 
 
+def _light_room(body: Body) -> dict[str, Any]:
+    """Detach push --watch so the owner room lights without a second terminal."""
+    if not studio_configured():
+        return {"ok": False, "skipped": "EMBODY_STUDIO_URL not set"}
+    try:
+        pid = spawn_watch(body)
+    except OSError as exc:
+        return {"ok": False, "error": str(exc)}
+    if body.session is not None:
+        body.session.watch_pid = pid
+    return {"ok": True, "pid": pid}
+
+
 def cmd_session_start(args: argparse.Namespace) -> int:
     state = load()
     body = _resolve_body(state, args.body)
@@ -495,6 +510,7 @@ def cmd_session_start(args: argparse.Namespace) -> int:
         )
     policy = _startable_policy(body, args.as_name)
     guard_concurrency(state, body)
+    old_watch = body.session.watch_pid if body.session else None
     adapter = run_adapter(body, "start", policy=policy, dry_run=bool(args.dry_run))
     body.session = Session(
         id=new_id("session"),
@@ -512,16 +528,26 @@ def cmd_session_start(args: argparse.Namespace) -> int:
         "show": show,
         "adapter": adapter,
         "state": str(path),
-        "note": (
-            "sim is running. Keep the hosted room live (and let the owner drive) with "
-            f"python3 -m embody push --watch --body {_body_name(body)} "
-            "or let session do push each trick."
-        ),
+        "note": "sim is running. Owner room lights with this start.",
     }
     if not args.dry_run:
+        stop_watch(old_watch)
         pushed = _owner_push(body, show=show)
         if pushed is not None:
             payload["pushed"] = pushed
+        watch = _light_room(body)
+        payload["watch"] = watch
+        path = save(state)
+        payload["session"] = body.session.to_dict()
+        payload["state"] = str(path)
+        if watch.get("ok"):
+            payload["note"] = "sim is running. Owner room is live; last write wins with the page."
+        elif watch.get("skipped"):
+            payload["note"] = (
+                "sim is running. Set EMBODY_STUDIO_URL so start can light the owner room."
+            )
+        else:
+            payload["note"] = "sim is running. Owner room watch did not start."
     return _dump(payload)
 
 
@@ -636,6 +662,9 @@ def cmd_session_status(args: argparse.Namespace) -> int:
 def cmd_session_stop(args: argparse.Namespace) -> int:
     state = load()
     body = _resolve_body(state, args.body)
+    watch_pid = body.session.watch_pid if body.session else None
+    if not args.dry_run:
+        stop_watch(watch_pid)
     adapter: dict[str, Any] | None = None
     try:
         adapter = run_adapter(body, "stop", dry_run=bool(args.dry_run))
@@ -761,6 +790,17 @@ def cmd_push_watch(args: argparse.Namespace) -> int:
             f"no running session on {_body_name(body)} — "
             f"python3 -m embody session start --body {_body_name(body)}"
         )
+    live_pid = body.session.watch_pid
+    if (
+        not args.dry_run
+        and live_pid is not None
+        and live_pid != os.getpid()
+        and watch_alive(live_pid)
+    ):
+        raise CliError(
+            "watch already running for this session — session start spawned it; "
+            "session stop to end"
+        )
     if args.dry_run:
         document = push_document(body)
         document["listen"] = True
@@ -774,6 +814,9 @@ def cmd_push_watch(args: argparse.Namespace) -> int:
                 **document,
             }
         )
+    if body.session.watch_pid != os.getpid():
+        body.session.watch_pid = os.getpid()
+        save(state)
     ticks = 0
     retries = 0
     last_push = 0.0
@@ -1042,7 +1085,7 @@ def build_parser() -> argparse.ArgumentParser:
     pushed.add_argument(
         "--watch",
         action="store_true",
-        help="keep pushing Show snapshots, stream pose, and run owner-page drive commands (Ctrl+C stops watching, not the sim)",
+        help="foreground recover if the start-spawned watch died (Ctrl+C stops watching, not the sim)",
     )
     pushed.add_argument(
         "--interval",

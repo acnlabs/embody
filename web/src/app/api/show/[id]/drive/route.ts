@@ -42,6 +42,6 @@ export async function POST(
     ok: true,
     queued: true,
     command: parsed,
-    note: "Last write wins. push --watch on the machine runs this.",
+    note: "Last write wins. The machine's session watch runs this.",
   });
 }
