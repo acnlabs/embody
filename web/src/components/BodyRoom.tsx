@@ -5,6 +5,7 @@ import { useAuth0 } from "@auth0/auth0-react";
 import { useEffect, useState } from "react";
 import { AUTH0_AUDIENCE, AUTH0_CLIENT_ID } from "@/lib/auth0";
 import DuckSnapshot from "@/components/DuckSnapshot";
+import DrivePad, { type DriveRequest } from "@/components/DrivePad";
 import { poseFromNumbers } from "@/lib/duckPose";
 import type { BodyShow, Card } from "@/lib/types";
 
@@ -63,7 +64,7 @@ function Telemetry({ body }: { body: BodyShow }) {
         <div className="stat">
           <div className="label">遥测</div>
           <p className="sub" style={{ marginTop: "0.4rem" }}>
-            还没有实时数字。开车是 agent 的事，这里只在 push 时读一次快照。
+            还没有实时数字。session start 并 push --watch 后，这里跟快照。
           </p>
         </div>
       </div>
@@ -178,15 +179,22 @@ function stageCaption(body: BodyShow, hasJoints: boolean): string {
   if (!hasJoints) {
     return body.session_running ? "仿真在本机 · 等待下一帧 push" : "仿真在本机";
   }
-  return "仿真在本机 · 只读";
+  return "仿真在本机 · 人开 · agent 也能开";
 }
 
 function MainStage({ body }: { body: BodyShow }) {
   const pose = poseFromNumbers(body.numbers ?? null);
+  const isMicroduck = body.kind === "microduck";
   return (
     <div className="preview">
-      <DuckSnapshot pose={pose} />
-      <p className="stage-caption">{stageCaption(body, pose.hasJoints)}</p>
+      {isMicroduck ? (
+        <DuckSnapshot pose={pose} />
+      ) : (
+        <p className="stage-empty">还没有 {body.kind} 的外形。kind 有官方网格后再挂到这间房。</p>
+      )}
+      <p className="stage-caption">
+        {isMicroduck ? stageCaption(body, pose.hasJoints) : "仿真在本机"}
+      </p>
     </div>
   );
 }
@@ -214,7 +222,13 @@ function SkillCard({ card }: { card: Card }) {
   );
 }
 
-export function RoomView({ body }: { body: BodyShow }) {
+export function RoomView({
+  body,
+  send,
+}: {
+  body: BodyShow;
+  send?: (cmd: DriveRequest) => Promise<string | null>;
+}) {
   const cards = body.cards || [];
   return (
     <>
@@ -238,7 +252,10 @@ export function RoomView({ body }: { body: BodyShow }) {
 
       <div className="stage">
         <MainStage body={body} />
-        <Telemetry body={body} />
+        <div className="stage-rail">
+          <Telemetry body={body} />
+          {send ? <DrivePad body={body} send={send} /> : null}
+        </div>
       </div>
 
       {body.build && Object.keys(body.build).length ? <BuildSection build={body.build} /> : null}
@@ -323,7 +340,27 @@ function SignedRoom({ bodyId }: { bodyId: string }) {
     );
   }
   if (!body) return <p className="meta">读取身体…</p>;
-  return <RoomView body={body} />;
+  const send = async (cmd: DriveRequest): Promise<string | null> => {
+    try {
+      const token = await auth.getAccessTokenSilently({
+        authorizationParams: { audience: AUTH0_AUDIENCE },
+      });
+      const res = await fetch(`/api/show/${encodeURIComponent(bodyId)}/drive`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(cmd),
+      });
+      const json = (await res.json()) as { error?: string };
+      if (!res.ok) return json.error || res.statusText;
+      return null;
+    } catch (exc) {
+      return exc instanceof Error ? exc.message : "drive failed";
+    }
+  };
+  return <RoomView body={body} send={send} />;
 }
 
 export default function BodyRoom({ bodyId }: { bodyId: string }) {

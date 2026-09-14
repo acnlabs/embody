@@ -12,7 +12,7 @@
 ACN                身份 / 消息 / 任务 / 钱包 — 协作，不是身体遥控器
 AgentPlanet        上新 / Credits / embed / Store — 不是身体账本
 embody CLI         本机：获取 / 绑定 / 训练 / 管理 / 控制
-embody web         托管 owner studio — 只观察，不开车
+embody web         托管 owner studio — 观察；`push --watch` 时人和 agent 都能开
 kind runtime       这种机器怎么训、怎么动
 microduck-plugin   第一种运行时 — v0 探针，不是本平台
 ```
@@ -21,7 +21,7 @@ microduck-plugin   第一种运行时 — v0 探针，不是本平台
 
 `kind` 是控制契约；`build` 是这一台的装配清单。Microduck 仿真只记官方 61 维观测里有的东西（`imu`、`foot_contact`），不能手写 `camera`。真机前置摄像头在配对时再记。
 
-ACN join 不会自动有身体。设了 `EMBODY_STUDIO_URL` 时，`body add --origin sim` 先 **join 托管 studio**——注册表铸造 body id——再在本机实例化（没设 URL 时 id 只是本机的，`embody join` 收养后才能 push）。`--origin robot` 探测真机能探到的零件（`robotctl health --json`），没有鸭子就失败，不造假身体。会话仍只开仿真。然后 `bind`、`whoami`。Hub 卡由 agent 自己找；`policy attach` 只收指针。`show` / `status` 给卡片和数字；`push` 更新一具已 join 的身体到 **托管** 的 owner studio（`web/`）。回 ACN 是 agent 自己的事。网页不开车。本机 `embody studio` 只是调试 Show，不是产品。第二种机型、训练 CLI 不进本探针。
+ACN join 不会自动有身体。设了 `EMBODY_STUDIO_URL` 时，`body add --origin sim` 先 **join 托管 studio**——注册表铸造 body id——再在本机实例化（没设 URL 时 id 只是本机的，`embody join` 收养后才能 push）。`--origin robot` 探测真机能探到的零件（`robotctl health --json`），没有鸭子就失败，不造假身体。会话仍只开仿真。然后 `bind`、`whoami`。Hub 卡由 agent 自己找；`policy attach` 只收指针。`show` / `status` 给卡片和数字；`push` 更新一具已 join 的身体到 **托管** 的 owner studio（`web/`）。回 ACN 是 agent 自己的事。网页在本机 `push --watch` 时可以走 / 转 / 做招式，后到的指令赢。本机 `embody studio` 只是调试 Show，不是产品。第二种机型、训练 CLI 不进本探针。
 
 ## 安装
 

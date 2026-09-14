@@ -22,4 +22,6 @@ export type BodyShow = {
   note?: string;
   joined_at?: string;
   pushed_at?: string;
+  drive_listen_at?: string;
+  drive_listening?: boolean;
 };

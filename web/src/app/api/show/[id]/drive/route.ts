@@ -1,11 +1,12 @@
-import { isDriveListening } from "@/lib/drive";
-import { getBody } from "@/lib/ledger";
+import { randomBytes } from "crypto";
+import { parseDrive } from "@/lib/drive";
+import { getBody, putDrive } from "@/lib/ledger";
 import { fetchMyAgents } from "@/lib/myAgents";
 import { extractBearerToken, verifyUserToken } from "@/lib/userAuth";
 
 export const runtime = "nodejs";
 
-export async function GET(
+export async function POST(
   req: Request,
   ctx: { params: Promise<{ id: string }> },
 ) {
@@ -26,20 +27,21 @@ export async function GET(
   if (!mine.some((row) => row.id === body.bound_agent_id)) {
     return Response.json({ ok: false, error: "这具身体不属于你的 agent" }, { status: 403 });
   }
+  let payload: unknown;
+  try {
+    payload = await req.json();
+  } catch {
+    return Response.json({ ok: false, error: "JSON body required" }, { status: 400 });
+  }
+  const parsed = parseDrive(payload, `drv_${randomBytes(4).toString("hex")}`, new Date().toISOString());
+  if ("error" in parsed) {
+    return Response.json({ ok: false, error: parsed.error }, { status: 400 });
+  }
+  await putDrive(id, parsed);
   return Response.json({
     ok: true,
-    audience: "owner",
-    workplace: "studio",
-    show: {
-      ...body,
-      drive_listening: isDriveListening(body.drive_listen_at),
-    },
+    queued: true,
+    command: parsed,
+    note: "Last write wins. push --watch on the machine runs this.",
   });
-}
-
-export function POST() {
-  return Response.json(
-    { ok: false, error: "drive this body at POST /api/show/[id]/drive" },
-    { status: 405 },
-  );
 }

@@ -6,6 +6,7 @@ import re
 from typing import Any
 
 from embody.adapter_microduck import ADAPTER_ID, AdapterError as KindError, MicroduckRuntime
+from embody.drive import clamp_twist
 from embody.models import ORIGIN_SIM, Body, Policy, State
 from embody.runtime import BodyRuntime, BodyRuntimeError
 
@@ -142,6 +143,9 @@ def run(
     policy: Policy | None = None,
     alias: str | None = None,
     dry_run: bool = False,
+    x: float = 0.0,
+    y: float = 0.0,
+    yaw: float = 0.0,
 ) -> dict[str, Any]:
     runtime = get_runtime(body.kind)
     if runtime is None:
@@ -166,6 +170,11 @@ def run(
             if not alias:
                 raise BodyRuntimeError("do needs a policy alias")
             return runtime.do(alias, dry_run=dry_run)
+        if op == "twist":
+            cx, cy, cyaw = clamp_twist(x, y, yaw)
+            return runtime.twist(cx, cy, cyaw, dry_run=dry_run)
+        if op == "halt":
+            return runtime.halt(dry_run=dry_run)
         if op == "status":
             return runtime.status(dry_run=dry_run)
         if op == "stop":

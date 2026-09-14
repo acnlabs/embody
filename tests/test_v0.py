@@ -9,6 +9,7 @@ import pytest
 from embody import adapter_microduck
 from embody.adapters import get_runtime
 from embody.cli import main
+from embody.drive import clamp_twist
 from embody.models import Session, State, asset_ref, hub_resolve
 from embody.push import PushError, post_show, transient_push_error
 from embody.show import lift_runtime_numbers, public_runtime_error
@@ -301,6 +302,8 @@ def _mock_skill(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         "#!/bin/sh\n"
         'if [ "$1" = "status" ]; then echo \'{"tilt_deg": 1.5, "ok": true}\'; exit 0; fi\n'
         'if [ "$1" = "do" ]; then echo \'{"tilt_deg": 2.0, "ok": true, "executed": true}\'; exit 0; fi\n'
+        'if [ "$1" = "twist" ]; then echo \'{"ok": true, "twist": true}\'; exit 0; fi\n'
+        'if [ "$1" = "stop" ]; then echo \'{"ok": true, "halted": true}\'; exit 0; fi\n'
         "echo mock\n",
         encoding="utf-8",
     )
@@ -371,6 +374,10 @@ def test_session_per_body_and_adapter_one_sim(
     assert prep["argv"][0].endswith("doctor.sh")
     stopped = adapter_microduck.MicroduckRuntime().stop(dry_run=True)
     assert stopped["argv"][-1] == "shutdown"
+    twisted = adapter_microduck.MicroduckRuntime().twist(0.2, 0.0, 0.8, dry_run=True)
+    assert twisted["argv"][-7:] == ["twist", "--x", "0.2", "--y", "0.0", "--yaw", "0.8"]
+    halted = adapter_microduck.MicroduckRuntime().halt(dry_run=True)
+    assert halted["argv"][-1] == "stop"
 
 
 def test_session_do_pushes_owner_show(
@@ -542,6 +549,7 @@ class RegistryStub:
         stub = self
         stub.registered = set()
         stub.requests: list[dict] = []
+        stub.inbox: dict[str, dict] = {}
 
         class Handler(BaseHTTPRequestHandler):
             def do_POST(self) -> None:
@@ -567,6 +575,27 @@ class RegistryStub:
                         status, payload = 404, {"ok": False, "error": "join first"}
                     else:
                         status, payload = 200, {"ok": True, "room": f"/b/{show['id']}"}
+                else:
+                    status, payload = 404, {"ok": False}
+                raw = json.dumps(payload).encode()
+                self.send_response(status)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(raw)))
+                self.end_headers()
+                self.wfile.write(raw)
+
+            def do_GET(self) -> None:
+                stub.requests.append(
+                    {"path": self.path, "auth": self.headers.get("Authorization"), "body": None}
+                )
+                prefix = "/api/agent/inbox/"
+                if self.path.startswith(prefix):
+                    wanted = self.path[len(prefix) :]
+                    if wanted not in stub.registered:
+                        status, payload = 404, {"ok": False, "error": "join first"}
+                    else:
+                        cmd = stub.inbox.pop(wanted, None)
+                        status, payload = 200, {"ok": True, "command": cmd}
                 else:
                     status, payload = 404, {"ok": False}
                 raw = json.dumps(payload).encode()
@@ -921,6 +950,7 @@ def test_push_watch_stops_when_session_ends(
         assert main(["push", "--watch", "--body", "duck-1", "--interval", "0.01"]) == 0
         shows = [row for row in stub.requests if row["path"] == "/api/agent/show"]
         assert len(shows) == 2
+        assert shows[0]["body"]["listen"] is True
         assert shows[0]["body"]["show"]["session_running"] is True
         assert shows[1]["body"]["show"]["session_running"] is False
     finally:
@@ -984,6 +1014,7 @@ def test_push_watch_retries_ssl_then_succeeds(
             save(state)
 
     monkeypatch.setattr("embody.cli.push_document", fake_document)
+    monkeypatch.setattr("embody.cli.take_inbox", lambda _id: None)
     monkeypatch.setattr("embody.cli.post_show", fake_post)
     monkeypatch.setattr("embody.cli.time.sleep", fake_sleep)
     capsys.readouterr()
@@ -1008,7 +1039,63 @@ def test_push_watch_401_does_not_retry(
         raise PushError("embody web push failed (401): ACN bearer required")
 
     monkeypatch.setattr("embody.cli.push_document", fake_document)
+    monkeypatch.setattr("embody.cli.take_inbox", lambda _id: None)
     monkeypatch.setattr("embody.cli.post_show", fake_post)
     monkeypatch.setattr("embody.cli.time.sleep", sleeps.append)
     assert main(["push", "--watch", "--body", "duck-1"]) == 1
     assert sleeps == []
+
+
+def test_clamp_twist_caps() -> None:
+    assert clamp_twist(9, 9, 9) == (0.3, 0.2, 1.5)
+    assert clamp_twist(-9, -9, -9) == (-0.3, -0.2, -1.5)
+    assert clamp_twist("no", None, float("nan")) == (0.0, 0.0, 0.0)
+
+
+def test_session_twist_and_halt_dry_run(
+    home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _mock_skill(tmp_path, monkeypatch)
+    add_sim("duck-1")
+    bind_offline()
+    run(["policy", "attach", "--hub", "neil-jo/microduck-walk", "--as", "walk"])
+    run(["session", "start", "--dry-run"])
+    capsys.readouterr()
+    assert main(["session", "twist", "--x", "0.2", "--yaw", "0.8", "--dry-run"]) == 0
+    twisted = json.loads(capsys.readouterr().out)
+    assert twisted["adapter"]["argv"][-7:] == ["twist", "--x", "0.2", "--y", "0.0", "--yaw", "0.8"]
+    capsys.readouterr()
+    assert main(["session", "halt", "--dry-run"]) == 0
+    halted = json.loads(capsys.readouterr().out)
+    assert halted["adapter"]["argv"][-1] == "stop"
+
+
+def test_push_watch_runs_owner_inbox(
+    home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _mock_skill(tmp_path, monkeypatch)
+    add_sim("duck-1")
+    bind_offline()
+    run(["policy", "attach", "--hub", "neil-jo/microduck-walk", "--as", "walk"])
+    _mark_running()
+    stub = RegistryStub()
+    try:
+        monkeypatch.setenv("EMBODY_STUDIO_URL", stub.url)
+        monkeypatch.setenv("ACN_API_KEY", "acn_test")
+        capsys.readouterr()
+        assert main(["join", "--body", "duck-1"]) == 0
+        stub.inbox[load().bodies[0].id] = {"op": "twist", "x": 0.2, "y": 0, "yaw": 0}
+
+        def fake_sleep(_seconds: float) -> None:
+            state = load()
+            state.bodies[0].session = None
+            save(state)
+
+        monkeypatch.setattr("embody.cli.time.sleep", fake_sleep)
+        capsys.readouterr()
+        assert main(["push", "--watch", "--body", "duck-1", "--interval", "0.01"]) == 0
+        out = capsys.readouterr().out
+        assert '"drove"' in out
+        assert '"op": "twist"' in out
+    finally:
+        stub.close()

@@ -124,6 +124,21 @@ class MicroduckRuntime:
     def do(self, alias: str, *, dry_run: bool) -> dict:
         return _checked("do", alias, dry_run=dry_run)
 
+    def twist(self, x: float, y: float, yaw: float, *, dry_run: bool) -> dict:
+        return _checked(
+            "twist",
+            "--x",
+            str(x),
+            "--y",
+            str(y),
+            "--yaw",
+            str(yaw),
+            dry_run=dry_run,
+        )
+
+    def halt(self, *, dry_run: bool) -> dict:
+        return _checked("stop", dry_run=dry_run)
+
     def status(self, *, dry_run: bool) -> dict:
         return _checked("status", dry_run=dry_run)
 

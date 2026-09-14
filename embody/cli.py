@@ -34,7 +34,7 @@ from embody.models import (
     validate_origin,
 )
 from embody.join import JoinError, join_body, leave_body, studio_configured
-from embody.push import PushError, post_show, push_document, transient_push_error
+from embody.push import PushError, post_show, push_document, take_inbox, transient_push_error
 from embody.show import body_card, live_show, public_runtime_error, show_for
 from embody.studio import DEFAULT_BIND, DEFAULT_PORT, serve as serve_studio
 from embody.store import load, save
@@ -50,7 +50,7 @@ def _dump(payload: dict[str, Any]) -> int:
 
 
 def _owner_push(body: Body, *, show: dict[str, Any] | None = None) -> dict[str, Any] | None:
-    """Owner room follows the agent. Drive verbs push; the page does not drive."""
+    """Owner room follows the agent. Watch also drains page drive commands."""
     if not studio_configured():
         return None
     try:
@@ -513,7 +513,7 @@ def cmd_session_start(args: argparse.Namespace) -> int:
         "adapter": adapter,
         "state": str(path),
         "note": (
-            "sim is running. Keep the hosted room live with "
+            "sim is running. Keep the hosted room live (and let the owner drive) with "
             f"python3 -m embody push --watch --body {_body_name(body)} "
             "or let session do push each trick."
         ),
@@ -562,7 +562,62 @@ def cmd_session_do(args: argparse.Namespace) -> int:
         "policy": policy.to_dict(),
         "show": show,
         "adapter": adapter,
-        "note": "owner studio follows this push; the page does not drive",
+        "note": "owner studio follows this push; last write wins with the page",
+    }
+    if not args.dry_run:
+        pushed = _owner_push(body, show=show)
+        if pushed is not None:
+            payload["pushed"] = pushed
+    return _dump(payload)
+
+
+def cmd_session_twist(args: argparse.Namespace) -> int:
+    state = load()
+    body = _resolve_body(state, args.body)
+    if body.session is None:
+        raise CliError(
+            f"no session on {body.name or body.id} — "
+            f"run: python3 -m embody session start --body {body.name or body.id}"
+        )
+    adapter = run_adapter(
+        body,
+        "twist",
+        x=float(args.x),
+        y=float(args.y),
+        yaw=float(args.yaw),
+        dry_run=bool(args.dry_run),
+    )
+    show = show_for(body, adapter=adapter)
+    payload: dict[str, Any] = {
+        "ok": True,
+        "body": body.name or body.id,
+        "show": show,
+        "adapter": adapter,
+        "note": "last write wins with the owner page",
+    }
+    if not args.dry_run:
+        pushed = _owner_push(body, show=show)
+        if pushed is not None:
+            payload["pushed"] = pushed
+    return _dump(payload)
+
+
+def cmd_session_halt(args: argparse.Namespace) -> int:
+    state = load()
+    body = _resolve_body(state, args.body)
+    if body.session is None:
+        raise CliError(
+            f"no session on {body.name or body.id} — "
+            f"run: python3 -m embody session start --body {body.name or body.id}"
+        )
+    adapter = run_adapter(body, "halt", dry_run=bool(args.dry_run))
+    show = show_for(body, adapter=adapter)
+    payload: dict[str, Any] = {
+        "ok": True,
+        "body": body.name or body.id,
+        "show": show,
+        "adapter": adapter,
+        "note": "twist zeroed; session still running",
     }
     if not args.dry_run:
         pushed = _owner_push(body, show=show)
@@ -669,6 +724,32 @@ def cmd_push(args: argparse.Namespace) -> int:
     return _dump({"ok": True, "pushed": True, "room": remote.get("room"), "show": document["show"]})
 
 
+INBOX_POLL = 0.2
+
+
+def _apply_inbox(body: Body, cmd: dict[str, Any]) -> dict[str, Any]:
+    op = str(cmd.get("op") or "").strip()
+    if op == "twist":
+        adapter = run_adapter(
+            body,
+            "twist",
+            x=float(cmd.get("x") or 0),
+            y=float(cmd.get("y") or 0),
+            yaw=float(cmd.get("yaw") or 0),
+        )
+        return {"op": "twist", "adapter": adapter}
+    if op == "halt":
+        adapter = run_adapter(body, "halt")
+        return {"op": "halt", "adapter": adapter}
+    if op == "do":
+        alias = str(cmd.get("alias") or "").strip()
+        if not alias:
+            raise CliError("inbox do needs an alias")
+        adapter = run_adapter(body, "do", alias=alias)
+        return {"op": "do", "alias": alias, "adapter": adapter}
+    raise CliError(f"unknown inbox op {op!r}")
+
+
 def cmd_push_watch(args: argparse.Namespace) -> int:
     interval = float(args.interval)
     if interval <= 0:
@@ -682,55 +763,83 @@ def cmd_push_watch(args: argparse.Namespace) -> int:
         )
     if args.dry_run:
         document = push_document(body)
+        document["listen"] = True
         return _dump(
             {
                 "ok": True,
                 "dry_run": True,
                 "watch": True,
                 "interval": interval,
+                "inbox_poll": INBOX_POLL,
                 **document,
             }
         )
     ticks = 0
     retries = 0
+    last_push = 0.0
     try:
         while True:
             state = load()
             body = _resolve_body(state, args.body, need_bound=True)
             running = body.session is not None
-            document = push_document(body)
             try:
-                remote = post_show(document)
+                cmd = take_inbox(body.id)
             except PushError as exc:
                 if not transient_push_error(exc):
                     raise CliError(str(exc)) from exc
-                retries += 1
+                cmd = None
+            if cmd:
+                try:
+                    drove = _apply_inbox(body, cmd)
+                    _dump({"ok": True, "watch": True, "drove": drove})
+                except (AdapterError, CliError) as exc:
+                    _dump(
+                        {
+                            "ok": False,
+                            "watch": True,
+                            "error": public_runtime_error(exc)
+                            if isinstance(exc, AdapterError)
+                            else str(exc),
+                        }
+                    )
+            now = time.monotonic()
+            due = last_push == 0.0 or (now - last_push) >= interval or not running
+            if due:
+                document = push_document(body)
+                document["listen"] = True
+                try:
+                    remote = post_show(document)
+                except PushError as exc:
+                    if not transient_push_error(exc):
+                        raise CliError(str(exc)) from exc
+                    retries += 1
+                    _dump(
+                        {
+                            "ok": False,
+                            "watch": True,
+                            "retry": retries,
+                            "error": "hosted studio unreachable; retrying",
+                        }
+                    )
+                    time.sleep(min(INBOX_POLL, interval))
+                    continue
+                retries = 0
+                last_push = now
+                ticks += 1
                 _dump(
                     {
-                        "ok": False,
+                        "ok": True,
+                        "pushed": True,
                         "watch": True,
-                        "retry": retries,
-                        "error": "hosted studio unreachable; retrying",
+                        "tick": ticks,
+                        "room": remote.get("room"),
+                        "session_running": running,
+                        "show": document["show"],
                     }
                 )
-                time.sleep(interval)
-                continue
-            retries = 0
-            ticks += 1
-            _dump(
-                {
-                    "ok": True,
-                    "pushed": True,
-                    "watch": True,
-                    "tick": ticks,
-                    "room": remote.get("room"),
-                    "session_running": running,
-                    "show": document["show"],
-                }
-            )
-            if not running:
-                return 0
-            time.sleep(interval)
+                if not running:
+                    return 0
+            time.sleep(min(INBOX_POLL, interval))
     except KeyboardInterrupt:
         return _dump({"ok": True, "watch": True, "tick": ticks, "stopped": "interrupt"})
 
@@ -883,6 +992,17 @@ def build_parser() -> argparse.ArgumentParser:
     do.add_argument("--dry-run", action="store_true")
     _add_body_flag(do)
     do.set_defaults(func=cmd_session_do)
+    twist = session_sub.add_parser("twist", help="set walk velocity (last write wins with the page)")
+    twist.add_argument("--x", type=float, default=0.0)
+    twist.add_argument("--y", type=float, default=0.0)
+    twist.add_argument("--yaw", type=float, default=0.0)
+    twist.add_argument("--dry-run", action="store_true")
+    _add_body_flag(twist)
+    twist.set_defaults(func=cmd_session_twist)
+    halt = session_sub.add_parser("halt", help="zero twist; keep the session")
+    halt.add_argument("--dry-run", action="store_true")
+    _add_body_flag(halt)
+    halt.set_defaults(func=cmd_session_halt)
     sstatus = session_sub.add_parser("status")
     sstatus.add_argument("--dry-run", action="store_true")
     _add_body_flag(sstatus)
@@ -909,9 +1029,14 @@ def build_parser() -> argparse.ArgumentParser:
     pushed.add_argument(
         "--watch",
         action="store_true",
-        help="keep pushing while this body's session runs (Ctrl+C stops watching, not the sim)",
+        help="keep pushing Show snapshots and run owner-page drive commands (Ctrl+C stops watching, not the sim)",
     )
-    pushed.add_argument("--interval", type=float, default=5.0, help="seconds between watch ticks")
+    pushed.add_argument(
+        "--interval",
+        type=float,
+        default=5.0,
+        help="seconds between Show snapshots (inbox polls ~0.2s)",
+    )
     _add_body_flag(pushed)
     pushed.set_defaults(func=cmd_push)
 

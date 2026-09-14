@@ -92,7 +92,8 @@ export async function POST(req: Request) {
       { status: 404 },
     );
   }
-  const stored = await upsertBody(show);
+  const listen = Boolean((payload as { listen?: unknown }).listen);
+  const stored = await upsertBody(show, { listen });
   return Response.json({
     ok: true,
     room: `/b/${stored.id}`,

@@ -359,6 +359,33 @@ pre code { background: none; border: none; padding: 0; }
   .stage { grid-template-columns: 1fr; }
 }
 
+.stage-rail { display: flex; flex-direction: column; gap: 0.7rem; }
+
+.drive-pad { display: flex; flex-direction: column; gap: 0.7rem; }
+
+.drive-grid, .drive-tricks {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem;
+  margin-top: 0.55rem;
+}
+
+.drive-btn {
+  min-height: 2.4rem;
+  font-weight: 600;
+  user-select: none;
+  touch-action: none;
+}
+
+.drive-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  border-color: var(--line);
+  color: var(--muted);
+}
+
+.drive-btn.halt { grid-column: 1 / -1; }
+
 .preview {
   position: relative;
   aspect-ratio: 16 / 9;
@@ -393,6 +420,19 @@ pre code { background: none; border: none; padding: 0; }
   padding: 0.15rem 0.5rem;
   border-radius: 4px;
   pointer-events: none;
+}
+
+.preview .stage-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 1.25rem;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.88rem;
 }
 
 /* Telemetry rail — Foxglove-style stat panels */

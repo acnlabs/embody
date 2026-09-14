@@ -1,10 +1,13 @@
 import { mkdirSync, readFileSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
+import type { DriveCmd } from "@/lib/drive";
+import { isDriveFresh } from "@/lib/drive";
 import type { BodyShow } from "@/lib/types";
 
-type Ledger = { bodies: Record<string, BodyShow> };
+type Ledger = { bodies: Record<string, BodyShow>; inboxes?: Record<string, DriveCmd> };
 
 const KV_KEY = "embody:bodies";
+const INBOX_KEY = "embody:inbox";
 
 function kvCreds(): { url: string; token: string } | null {
   const url = (process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL)?.trim();
@@ -55,11 +58,17 @@ async function readLedger(): Promise<Ledger> {
   return { bodies };
 }
 
+function persistShow(show: BodyShow): BodyShow {
+  const stored = { ...show };
+  delete stored.drive_listening;
+  return stored;
+}
+
 /** Registry write: a body joins and gets its id recorded. null = id already taken. */
 export async function registerBody(row: BodyShow): Promise<BodyShow | null> {
   const ledger = await readLedger();
   if (ledger.bodies[row.id]) return null;
-  const stored: BodyShow = { ...row, joined_at: new Date().toISOString() };
+  const stored: BodyShow = persistShow({ ...row, joined_at: new Date().toISOString() });
   if (useKv()) {
     const client = await kv();
     await client.hset(KV_KEY, { [stored.id]: stored });
@@ -70,14 +79,19 @@ export async function registerBody(row: BodyShow): Promise<BodyShow | null> {
   return stored;
 }
 
-export async function upsertBody(show: BodyShow): Promise<BodyShow> {
+export async function upsertBody(
+  show: BodyShow,
+  opts?: { listen?: boolean },
+): Promise<BodyShow> {
   const existing = (await readLedger()).bodies[show.id];
-  const stored: BodyShow = {
+  const now = new Date().toISOString();
+  const stored: BodyShow = persistShow({
     ...show,
     joined_at: existing?.joined_at,
-    pushed_at: new Date().toISOString(),
+    pushed_at: now,
     build: show.build ?? existing?.build,
-  };
+    drive_listen_at: opts?.listen ? now : existing?.drive_listen_at,
+  });
   if (useKv()) {
     const client = await kv();
     await client.hset(KV_KEY, { [stored.id]: stored });
@@ -87,6 +101,51 @@ export async function upsertBody(show: BodyShow): Promise<BodyShow> {
   ledger.bodies[stored.id] = stored;
   writeFile(ledger);
   return stored;
+}
+
+export async function touchDriveListen(id: string): Promise<void> {
+  const existing = await getBody(id);
+  if (!existing) return;
+  const stored: BodyShow = persistShow({
+    ...existing,
+    drive_listen_at: new Date().toISOString(),
+  });
+  if (useKv()) {
+    const client = await kv();
+    await client.hset(KV_KEY, { [stored.id]: stored });
+    return;
+  }
+  const ledger = readFile();
+  ledger.bodies[stored.id] = stored;
+  writeFile(ledger);
+}
+
+export async function putDrive(id: string, cmd: DriveCmd): Promise<void> {
+  if (useKv()) {
+    const client = await kv();
+    await client.hset(INBOX_KEY, { [id]: cmd });
+    return;
+  }
+  const ledger = readFile();
+  ledger.inboxes = { ...ledger.inboxes, [id]: cmd };
+  writeFile(ledger);
+}
+
+export async function takeDrive(id: string): Promise<DriveCmd | null> {
+  if (useKv()) {
+    const client = await kv();
+    const cmd = await client.hget<DriveCmd>(INBOX_KEY, id);
+    if (!cmd) return null;
+    await client.hdel(INBOX_KEY, id);
+    return isDriveFresh(cmd) ? cmd : null;
+  }
+  const ledger = readFile();
+  const cmd = ledger.inboxes?.[id] ?? null;
+  if (cmd && ledger.inboxes) {
+    delete ledger.inboxes[id];
+    writeFile(ledger);
+  }
+  return cmd && isDriveFresh(cmd) ? cmd : null;
 }
 
 export async function getBody(id: string): Promise<BodyShow | null> {
@@ -104,10 +163,12 @@ export async function deleteBody(id: string): Promise<BodyShow | null> {
   if (useKv()) {
     const client = await kv();
     await client.hdel(KV_KEY, id);
+    await client.hdel(INBOX_KEY, id);
     return existing;
   }
   const ledger = readFile();
   delete ledger.bodies[id];
+  if (ledger.inboxes) delete ledger.inboxes[id];
   writeFile(ledger);
   return existing;
 }

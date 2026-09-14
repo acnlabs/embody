@@ -108,14 +108,14 @@ Policy preview: `https://huggingface.co/{repo}/resolve/main/preview.mp4`. A raw 
 | Bind | This body ↔ this agent; body asks ACN | `bind`, then `whoami` |
 | Train | Studio verb; the kind runtime trains (no generic PPO in the kernel) | Runtime only. No `train` in this kernel. |
 | Manage | Many bodies, many cards, venues | `body` / `policy` list, attach |
-| Control | Session on the body's origin | `prepare` / `start` / `pull` / `do` / `status` / `stop` (v0: `origin=sim`) |
-| Show | Card + numbers | CLI `show` / `status`. Agent `push`es a snapshot to hosted owner studio (`web/`). `push --watch` keeps pushing while the session runs; the page polls, it does not drive. Hub preview + onnx; live `numbers` pass through. No fallen verdict. Agent drives and replies on ACN. Local `embody studio` is debug only. |
+| Control | Session on the body's origin | `prepare` / `start` / `pull` / `do` / `twist` / `halt` / `status` / `stop` (v0: `origin=sim`) |
+| Show | Card + numbers | CLI `show` / `status`. Agent `push`es a snapshot to hosted owner studio (`web/`). `push --watch` keeps pushing and runs owner-page `twist` / `do` / `halt` (last write wins). The page cannot reach localhost sim; it enqueues. Hub preview + onnx; live `numbers` pass through. No fallen verdict. Agent replies on ACN. Local `embody studio` is debug only. |
 
 Datacollect and real-robot lines stay in the kind runtime. Real-robot commands print by default. JSONL does not enter official PPO.
 
 ## Kind runtime
 
-Contract: [body-runtime-v0.md](./body-runtime-v0.md). Kernel dispatches `prepare` / `start` / `pull` / `do` / `status` / `stop` by `kind`. `start` always `prepare`s first. It does not call vendor scripts or runtime-private env. It does not search Hub.
+Contract: [body-runtime-v0.md](./body-runtime-v0.md). Kernel dispatches `prepare` / `start` / `pull` / `do` / `twist` / `halt` / `status` / `stop` by `kind`. `start` always `prepare`s first. It does not call vendor scripts or runtime-private env. It does not search Hub.
 
 | `kind` | Runtime | v0 |
 |---|---|---|
@@ -137,7 +137,7 @@ Out of this probe: Jobs training CLI, real-robot **session**, Credits, a second 
 | ACN | Identity, tasks, collaboration with the **agent**. Optional later: a public nameplate. | Session verbs. Joint commands. Own the workplace ledger. Talk to the body. |
 | AgentPlanet | Launch / Credits / embed / Store. Owner identity: `my-agents`. | Body title. Body remote. Charge `source=embody`. Receive body POSTs. |
 | embody CLI | Create / bind / drive on this machine. `push` a Show snapshot to Embody web. | Call ACN about tasks. Store task ids. Search Hub. Bind the laptop instead of the body. POST the AgentPlanet registry. |
-| embody web | Hosted owner rooms. Mint body ids (`join`). Auth0 (same tenant as ComicLaw). Accept agent `push`. | Session verbs. Hub search. Credits. Interfaze (until embed_hosts). Localhost-as-product. |
+| embody web | Hosted owner rooms. Mint body ids (`join`). Auth0 (same tenant as ComicLaw). Accept agent `push`. Enqueue `twist` / `do` / `halt` for `push --watch` to run. | Talk to localhost sim. Hub search. Credits. Interfaze (until embed_hosts). Localhost-as-product. |
 | kind runtime | Train and move this machine type. | Become the platform. Rank Hub cards for the workplace. |
 
 `registry print` dumps the **local** ledger. It does not POST. `push` writes to **Embody web**, not AgentPlanet.

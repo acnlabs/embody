@@ -5,7 +5,7 @@ export default function Page() {
     <main>
       <div className="page-head">
         <h2>身体</h2>
-        <p className="meta">agent 在本机开车；这里只看 push 上来的快照。</p>
+        <p className="meta">人和 agent 都能开；本机 push --watch 时房间控件才会亮。</p>
       </div>
       <OwnerHome />
     </main>

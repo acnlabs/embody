@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import urllib.error
+import urllib.parse
 import urllib.request
 from typing import Any
 
@@ -11,6 +12,7 @@ from embody.models import Body
 from embody.show import live_show
 
 DEFAULT_PUSH_PATH = "/api/agent/show"
+DEFAULT_INBOX_PATH = "/api/agent/inbox"
 
 
 class PushError(RuntimeError):
@@ -48,30 +50,25 @@ def push_document(body: Body, *, show: dict[str, Any] | None = None) -> dict[str
         "show": show if show is not None else live_show(body),
         "note": "Observation snapshot. Embody web stores this; AgentPlanet does not.",
     }
-    return {
-        "ok": True,
-        "audience": "owner",
-        "workplace": "studio",
-        "show": live_show(body),
-        "note": "Observation snapshot. Embody web stores this; AgentPlanet does not.",
-    }
 
 
-def post_show(document: dict[str, Any], *, timeout: float = 15.0) -> dict[str, Any]:
+def _studio_request(
+    url: str,
+    *,
+    method: str,
+    data: bytes | None = None,
+    timeout: float,
+) -> dict[str, Any]:
     key = api_key()
     if not key:
         raise PushError("ACN_API_KEY is required to push (hosted studio checks /agents/me)")
-    url = f"{studio_url()}{DEFAULT_PUSH_PATH}"
-    req = urllib.request.Request(
-        url,
-        data=json.dumps(document, ensure_ascii=False).encode("utf-8"),
-        headers={
-            "Authorization": f"Bearer {key}",
-            "Accept": "application/json",
-            "Content-Type": "application/json; charset=utf-8",
-        },
-        method="POST",
-    )
+    headers = {
+        "Authorization": f"Bearer {key}",
+        "Accept": "application/json",
+    }
+    if data is not None:
+        headers["Content-Type"] = "application/json; charset=utf-8"
+    req = urllib.request.Request(url, data=data, headers=headers, method=method)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             payload = json.loads(resp.read().decode("utf-8"))
@@ -85,3 +82,23 @@ def post_show(document: dict[str, Any], *, timeout: float = 15.0) -> dict[str, A
     if not isinstance(payload, dict):
         raise PushError("embody web returned a non-object")
     return payload
+
+
+def post_show(document: dict[str, Any], *, timeout: float = 15.0) -> dict[str, Any]:
+    url = f"{studio_url()}{DEFAULT_PUSH_PATH}"
+    return _studio_request(
+        url,
+        method="POST",
+        data=json.dumps(document, ensure_ascii=False).encode("utf-8"),
+        timeout=timeout,
+    )
+
+
+def take_inbox(body_id: str, *, timeout: float = 5.0) -> dict[str, Any] | None:
+    token = (body_id or "").strip()
+    if not token:
+        raise PushError("body id required to read drive inbox")
+    url = f"{studio_url()}{DEFAULT_INBOX_PATH}/{urllib.parse.quote(token, safe='')}"
+    payload = _studio_request(url, method="GET", timeout=timeout)
+    cmd = payload.get("command")
+    return cmd if isinstance(cmd, dict) else None

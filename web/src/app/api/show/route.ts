@@ -22,10 +22,13 @@ export async function GET(req: Request) {
     owner: sub,
     agents: mine,
     show,
-    note: "Owner observation. The agent drives. Embody does not store task ids.",
+    note: "Owner rooms. Drive with the agent when push --watch is listening. Embody does not store task ids.",
   });
 }
 
 export function POST() {
-  return Response.json({ ok: false, error: "owner studio does not drive the body" }, { status: 405 });
+  return Response.json(
+    { ok: false, error: "drive a body at POST /api/show/[id]/drive" },
+    { status: 405 },
+  );
 }

@@ -5,7 +5,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Embody · studio",
-  description: "Hosted owner studio. The agent drives. This page only observes.",
+  description: "Hosted owner studio. Watch the body; drive when push --watch is listening.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -15,7 +15,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <AuthProvider>
           <SiteHeader />
           {children}
-          <footer>本机 agent 开车 · 这里只看 push 上来的快照 · 不评 fallen</footer>
+          <footer>人开 · agent 也能开 · 本机 push --watch 执行 · 不评 fallen</footer>
         </AuthProvider>
       </body>
     </html>

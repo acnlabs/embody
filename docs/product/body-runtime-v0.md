@@ -1,7 +1,7 @@
 # Body runtime v0
 
 **Status:** Kernel contract  
-**Used by:** studio session (`prepare` / `start` / `pull` / `do` / `status` / `stop`)  
+**Used by:** studio session (`prepare` / `start` / `pull` / `do` / `twist` / `halt` / `status` / `stop`)  
 **First implementation:** `kind=microduck` → [microduck-plugin](https://github.com/acnlabs/microduck-plugin)
 
 Embody does not know how a robot walks. It knows how a **body** is used: identity, Hub policy pointers, and these verbs. A new machine type adds a thin **kind runtime** that implements this file. It does not copy microduck-skill. The runtime is a seam, not a plugin store.
@@ -9,7 +9,7 @@ Embody does not know how a robot walks. It knows how a **body** is used: identit
 ## Layers
 
 ```text
-CLI (this machine) / hosted owner studio (observe only)
+CLI (this machine) / hosted owner studio (observe + enqueue drive)
   → body runtime (this document)
        → kind runtime (microduck-skill first)
             → vendor sim / firmware
@@ -55,6 +55,8 @@ Studio always uses these names. Missing verb → adapter error, not a kernel fal
 | `start` | Kernel calls `prepare` first. Then open a session on this body's origin (v0: `sim`) using a perpetual card | required | refuse |
 | `pull` | Load a named card into the running session | optional | required before `do` |
 | `do` | Fire a named episodic card | n/a | required |
+| `twist` | Set walk velocity (`x` m/s, `y` m/s, `yaw` rad/s). Caps: ±0.3 / ±0.2 / ±1.5 | required if the kind walks | n/a |
+| `halt` | Zero twist; keep the session | required if `twist` exists | n/a |
 | `status` | Numbers only (`tilt`, feet, joints, …). Kernel lifts runtime JSON as `show.numbers`. No fallen verdict | required | required |
 | `stop` | End this body's session | required | required |
 
@@ -72,7 +74,7 @@ A runtime registers `kind` → adapter id, a `default_build` (the as-built manif
 
 | `kind` | Runtime | `default_build` | Notes |
 |---|---|---|---|
-| `microduck` | microduck-skill | `bom=microduck-sim`; modules `imu`, `foot_contact` (no `camera`: official 61-dim obs has no image) | `prepare` → `doctor.sh --clone` then adopt default checkout; `stop` → `control.sh shutdown`; other verbs → `control.sh`; one localhost sim |
+| `microduck` | microduck-skill | `bom=microduck-sim`; modules `imu`, `foot_contact` (no `camera`: official 61-dim obs has no image) | `prepare` → `doctor.sh --clone` then adopt default checkout; `stop` → `control.sh shutdown`; `halt` → `control.sh stop`; other verbs → `control.sh`; one localhost sim |
 | other slugs | none | empty | Body and cards may exist; session errors |
 
 Do not lift into the kernel: observation/action size, PPO, Jobs, `robotctl`, Viser, joint indices, Hub search. The build is a record; policy hardware-gating on attach is a later seam.
