@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useAuth0 } from "@auth0/auth0-react";
 import { useEffect, useState } from "react";
 import { AUTH0_AUDIENCE, AUTH0_CLIENT_ID } from "@/lib/auth0";
+import DuckSnapshot from "@/components/DuckSnapshot";
+import { poseFromNumbers } from "@/lib/duckPose";
 import type { BodyShow, Card } from "@/lib/types";
 
 function fmtAgo(iso?: string): string {
@@ -171,19 +173,20 @@ function BuildSection({ build }: { build: Record<string, unknown> }) {
   );
 }
 
+function stageCaption(body: BodyShow, hasJoints: boolean): string {
+  if (body.numbers_error) return "仿真在本机 · 这次没读到关节";
+  if (!hasJoints) {
+    return body.session_running ? "仿真在本机 · 等待下一帧 push" : "仿真在本机";
+  }
+  return "仿真在本机 · 只读";
+}
+
 function MainStage({ body }: { body: BodyShow }) {
+  const pose = poseFromNumbers(body.numbers ?? null);
   return (
     <div className="preview">
-      <div className="hint">
-        <p className="hint-title">
-          {body.session_running ? "本机仿真窗正在动" : "这具身体在本机"}
-        </p>
-        <p>
-          Viser 仿真窗在本机；网页不嵌实时流、不嵌遥控，这里读的是 push 快照。
-          <br />
-          本机调试 Show 用 <code>python3 -m embody studio</code>。招式预览在下面的卡上。
-        </p>
-      </div>
+      <DuckSnapshot pose={pose} />
+      <p className="stage-caption">{stageCaption(body, pose.hasJoints)}</p>
     </div>
   );
 }
