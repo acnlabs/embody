@@ -8,6 +8,24 @@ export type DuckPose = {
   hasJoints: boolean;
 };
 
+/** STAND / HOME hinge qpos from the official scene_walk.xml keyframe. */
+export const HOME_JOINTS: Record<string, number> = {
+  left_hip_yaw: 0,
+  left_hip_roll: -0.08726646259971647,
+  left_hip_pitch: -0.457924,
+  left_knee: -0.00494,
+  left_ankle: 0.452984,
+  neck_pitch: 0.3490658503988659,
+  head_pitch: 0.3490658503988659,
+  head_yaw: 0,
+  head_roll: 0,
+  right_hip_yaw: 0,
+  right_hip_roll: 0.08726646259971647,
+  right_hip_pitch: 0.457924,
+  right_knee: 0.00494,
+  right_ankle: -0.452984,
+};
+
 const HOME: DuckPose = {
   joints: {},
   quat: null,
@@ -15,6 +33,11 @@ const HOME: DuckPose = {
   feet: {},
   hasJoints: false,
 };
+
+/** Absolute hinge angle: HOME + joints_rel_home. */
+export function hingeAngle(pose: DuckPose, name: string): number {
+  return (HOME_JOINTS[name] ?? 0) + (pose.joints[name] ?? 0);
+}
 
 function asFinite(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;

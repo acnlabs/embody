@@ -1,0 +1,9 @@
+Microduck kinematics and mesh (microduck.glb, kinematics.json)
+come from Pollen Robotics:
+
+  https://github.com/pollen-robotics/microduck_rl
+  https://huggingface.co/spaces/pollen-robotics/microduck-simulator
+
+Copyright 2026 Pollen Robotics
+Licensed under the Apache License, Version 2.0
+http://www.apache.org/licenses/LICENSE-2.0
