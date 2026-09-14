@@ -10,6 +10,13 @@ export function sessionLabel(running?: boolean): string {
   return running ? "开着" : "还没开";
 }
 
+export function agentLabel(body: { bound_agent_id: string; bound_agent_name?: string }): string {
+  const name = (body.bound_agent_name || "").trim();
+  const id = body.bound_agent_id;
+  if (name && name !== id) return name;
+  return id.slice(0, 8);
+}
+
 export function cardModeLabel(mode?: string): string | null {
   if (mode === "perpetual") return "步态";
   if (mode === "episodic") return "招式";

@@ -1,3 +1,5 @@
+import type { BodyShow } from "@/lib/types";
+
 function chatApiOrigin(): string {
   return (
     process.env.AGENTPLANET_API_URL?.trim() ||
@@ -10,12 +12,21 @@ export type MyAgent = { id: string; name: string };
 
 const myAgentsCache = new Map<string, { agents: MyAgent[]; exp: number }>();
 
+export function withBoundAgent(body: BodyShow, agents: MyAgent[]): BodyShow {
+  const hit = agents.find((row) => row.id === body.bound_agent_id);
+  const name = hit?.name?.trim();
+  return {
+    ...body,
+    bound_agent_name: hit && name && name !== hit.id ? name : undefined,
+  };
+}
+
 /** Identity only: which agents this Auth0 human owns. Not a body ledger. */
 export async function fetchMyAgents(bearer: string): Promise<MyAgent[] | null> {
   const token = bearer.trim();
   if (!token) return null;
-  const hit = myAgentsCache.get(token);
-  if (hit && hit.exp > Date.now()) return hit.agents;
+  const cached = myAgentsCache.get(token);
+  if (cached && cached.exp > Date.now()) return cached.agents;
   try {
     const res = await fetch(`${chatApiOrigin()}/api/chat/my-agents?limit=50`, {
       headers: { Authorization: `Bearer ${token}` },

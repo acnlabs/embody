@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useAuth0 } from "@auth0/auth0-react";
 import { useEffect, useState } from "react";
 import { AUTH0_AUDIENCE, AUTH0_CLIENT_ID } from "@/lib/auth0";
-import { originLabel, ownerError, sessionLabel } from "@/lib/copy";
+import { originLabel, ownerError, sessionLabel, agentLabel } from "@/lib/copy";
 import type { BodyShow } from "@/lib/types";
 
 type Payload = {
@@ -56,7 +56,7 @@ export function BodyCard({ body }: { body: BodyShow }) {
           <Link href={`/b/${body.id}`}>{body.name || body.id}</Link>
         </h3>
         <p className="meta">
-          {originLabel(body.origin)}
+          {originLabel(body.origin)} · 所属 {agentLabel(body)}
           {tricks ? ` · ${tricks} 个招式` : ""}
         </p>
         <ModuleChips body={body} />

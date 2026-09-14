@@ -7,7 +7,7 @@ import { AUTH0_AUDIENCE, AUTH0_CLIENT_ID } from "@/lib/auth0";
 import DuckSnapshot from "@/components/DuckSnapshot";
 import DrivePad, { type DriveRequest } from "@/components/DrivePad";
 import { poseFromNumbers } from "@/lib/duckPose";
-import { buildKeyLabel, cardModeLabel, originLabel, ownerError, sessionLabel } from "@/lib/copy";
+import { buildKeyLabel, cardModeLabel, originLabel, ownerError, sessionLabel, agentLabel } from "@/lib/copy";
 import type { BodyShow, Card } from "@/lib/types";
 
 function fmtAgo(iso?: string): string {
@@ -240,6 +240,7 @@ export function RoomView({
           </span>
         </div>
         <div className="sub">
+          <span title={body.bound_agent_id}>所属 {agentLabel(body)}</span>
           <span>更新于 {fmtAgo(body.pushed_at)}</span>
         </div>
       </header>

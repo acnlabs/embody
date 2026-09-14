@@ -1,7 +1,7 @@
 import { OWNER_ERR } from "@/lib/copy";
 import { isDriveListening } from "@/lib/drive";
 import { getBody } from "@/lib/ledger";
-import { fetchMyAgents } from "@/lib/myAgents";
+import { fetchMyAgents, withBoundAgent } from "@/lib/myAgents";
 import { extractBearerToken, verifyUserToken } from "@/lib/userAuth";
 
 export const runtime = "nodejs";
@@ -32,7 +32,7 @@ export async function GET(
     audience: "owner",
     workplace: "studio",
     show: {
-      ...body,
+      ...withBoundAgent(body, mine),
       drive_listening: isDriveListening(body.drive_listen_at),
     },
   });

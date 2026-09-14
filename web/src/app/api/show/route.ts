@@ -1,6 +1,6 @@
 import { OWNER_ERR } from "@/lib/copy";
 import { listBodiesForAgents } from "@/lib/ledger";
-import { fetchMyAgents } from "@/lib/myAgents";
+import { fetchMyAgents, withBoundAgent } from "@/lib/myAgents";
 import { extractBearerToken, verifyUserToken } from "@/lib/userAuth";
 
 export const runtime = "nodejs";
@@ -15,7 +15,9 @@ export async function GET(req: Request) {
   if (mine == null) {
     return Response.json({ ok: false, error: OWNER_ERR.down }, { status: 502 });
   }
-  const show = await listBodiesForAgents(mine.map((row) => row.id));
+  const show = (await listBodiesForAgents(mine.map((row) => row.id))).map((row) =>
+    withBoundAgent(row, mine),
+  );
   return Response.json({
     ok: true,
     audience: "owner",

@@ -66,6 +66,7 @@ async function readLedger(): Promise<Ledger> {
 function persistShow(show: BodyShow): BodyShow {
   const stored = { ...show };
   delete stored.drive_listening;
+  delete stored.bound_agent_name;
   return stored;
 }
 

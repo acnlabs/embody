@@ -13,6 +13,7 @@ export type BodyShow = {
   kind: string;
   origin: string;
   bound_agent_id: string;
+  bound_agent_name?: string;
   session_running?: boolean;
   build?: Record<string, unknown>;
   cards?: Card[];
