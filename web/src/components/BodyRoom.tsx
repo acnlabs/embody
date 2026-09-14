@@ -14,6 +14,7 @@ import {
   ownerError,
   sessionLabel,
   agentLabel,
+  bodyIsLive,
 } from "@/lib/copy";
 import { formatAgo, useI18n, type Translate } from "@/lib/i18n";
 import type { BodyShow, Card } from "@/lib/types";
@@ -183,8 +184,8 @@ function BuildSection({ build }: { build: Record<string, unknown> }) {
 
 function stageCaption(body: BodyShow, hasJoints: boolean, t: Translate): string {
   if (body.numbers_error) return t("room.captionLag");
-  if (!hasJoints) return body.session_running ? t("room.captionStill") : t("room.captionOff");
-  if (body.drive_listening) return t("room.captionDrive");
+  if (!hasJoints) return bodyIsLive(body) ? t("room.captionStill") : t("room.captionOff");
+  if (bodyIsLive(body)) return t("room.captionDrive");
   return t("room.captionOrbit");
 }
 
@@ -244,8 +245,8 @@ export function RoomView({
           <h2>{body.name || body.id}</h2>
           <span className="badge">{body.kind}</span>
           <span className="badge">{originLabel(body.origin, t)}</span>
-          <span className={`status${body.session_running ? " on" : ""}`}>
-            {sessionLabel(body.session_running, t)}
+          <span className={`status${bodyIsLive(body) ? " on" : ""}`}>
+            {sessionLabel(bodyIsLive(body), t)}
           </span>
         </div>
         <div className="sub">
@@ -319,7 +320,7 @@ function SignedRoom({ bodyId }: { bodyId: string }) {
   }, [auth.isAuthenticated, auth.getAccessTokenSilently, bodyId, t]);
 
   useEffect(() => {
-    if (!auth.isAuthenticated || !body?.session_running) {
+    if (!auth.isAuthenticated || !body || !bodyIsLive(body)) {
       setPoseLive(null);
       return;
     }
@@ -348,7 +349,7 @@ function SignedRoom({ bodyId }: { bodyId: string }) {
       cancel = true;
       clearInterval(timer);
     };
-  }, [auth.isAuthenticated, auth.getAccessTokenSilently, bodyId, body?.session_running]);
+  }, [auth.isAuthenticated, auth.getAccessTokenSilently, bodyId, body?.session_running, body?.drive_listening]);
 
   if (auth.isLoading) return <p className="meta">{t("home.loadingAuth")}</p>;
   if (!auth.isAuthenticated) {

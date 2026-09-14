@@ -1,4 +1,5 @@
 import { OWNER_ERR } from "@/lib/copy";
+import { isDriveListening } from "@/lib/drive";
 import { listBodiesForAgents } from "@/lib/ledger";
 import { fetchMyAgents, withBoundAgent } from "@/lib/myAgents";
 import { extractBearerToken, verifyUserToken } from "@/lib/userAuth";
@@ -15,9 +16,10 @@ export async function GET(req: Request) {
   if (mine == null) {
     return Response.json({ ok: false, error: OWNER_ERR.down }, { status: 502 });
   }
-  const show = (await listBodiesForAgents(mine.map((row) => row.id))).map((row) =>
-    withBoundAgent(row, mine),
-  );
+  const show = (await listBodiesForAgents(mine.map((row) => row.id))).map((row) => ({
+    ...withBoundAgent(row, mine),
+    drive_listening: isDriveListening(row.drive_listen_at),
+  }));
   return Response.json({
     ok: true,
     audience: "owner",

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { bodyIsLive } from "@/lib/copy";
 import { useI18n } from "@/lib/i18n";
 import type { BodyShow, Card } from "@/lib/types";
 
@@ -101,7 +102,7 @@ export default function DrivePad({
 }) {
   const { t } = useI18n();
   const [err, setErr] = useState("");
-  const armed = Boolean(body.session_running && body.drive_listening);
+  const armed = bodyIsLive(body);
   const episodic = (body.cards || []).filter((card) => card.mode === "episodic");
   const sendRef = useRef(send);
   sendRef.current = send;

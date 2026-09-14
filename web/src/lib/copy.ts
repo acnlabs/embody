@@ -19,6 +19,13 @@ export function sessionLabel(running: boolean | undefined, t: Translate): string
   return running ? t("session.on") : t("session.off");
 }
 
+export function bodyIsLive(body: {
+  session_running?: boolean;
+  drive_listening?: boolean;
+}): boolean {
+  return Boolean(body.session_running && body.drive_listening);
+}
+
 export function cardModeLabel(mode: string | undefined, t: Translate): string | null {
   if (mode === "perpetual") return t("cards.gait");
   if (mode === "episodic") return t("cards.trick");
