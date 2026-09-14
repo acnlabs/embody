@@ -56,7 +56,10 @@ def run_control(*args: str, dry_run: bool = False) -> dict[str, object]:
     argv = control_argv(skill, *args)
     if dry_run:
         return {"ok": True, "dry_run": True, "argv": argv, "skill": str(skill)}
-    proc = subprocess.run(argv, check=False, text=True, capture_output=True)
+    try:
+        proc = subprocess.run(argv, check=False, text=True, capture_output=True, timeout=8)
+    except subprocess.TimeoutExpired as exc:
+        raise AdapterError("microduck-skill timed out talking to localhost sim") from exc
     return {
         "ok": proc.returncode == 0,
         "returncode": proc.returncode,

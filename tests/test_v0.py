@@ -575,6 +575,12 @@ class RegistryStub:
                         status, payload = 404, {"ok": False, "error": "join first"}
                     else:
                         status, payload = 200, {"ok": True, "room": f"/b/{show['id']}"}
+                elif self.path == "/api/agent/pose":
+                    wanted = body.get("id")
+                    if wanted not in stub.registered:
+                        status, payload = 404, {"ok": False, "error": "join first"}
+                    else:
+                        status, payload = 200, {"ok": True}
                 else:
                     status, payload = 404, {"ok": False}
                 raw = json.dumps(payload).encode()
@@ -916,7 +922,7 @@ def test_push_watch_stops_when_session_ends(
     bind_offline()
     _mark_running()
 
-    def fake_document(body):
+    def fake_document(body, **_kwargs):
         return {
             "ok": True,
             "audience": "owner",
@@ -938,6 +944,7 @@ def test_push_watch_stops_when_session_ends(
         save(state)
 
     monkeypatch.setattr("embody.cli.push_document", fake_document)
+    monkeypatch.setattr("embody.cli.live_show", lambda body: fake_document(body)["show"])
     monkeypatch.setattr("embody.cli.time.sleep", fake_sleep)
 
     stub = RegistryStub()
@@ -988,7 +995,7 @@ def test_push_watch_retries_ssl_then_succeeds(
     _mark_running()
     hits = {"n": 0}
 
-    def fake_document(body):
+    def fake_document(body, **_kwargs):
         return {
             "ok": True,
             "show": {
@@ -1014,7 +1021,9 @@ def test_push_watch_retries_ssl_then_succeeds(
             save(state)
 
     monkeypatch.setattr("embody.cli.push_document", fake_document)
+    monkeypatch.setattr("embody.cli.live_show", lambda body: fake_document(body)["show"])
     monkeypatch.setattr("embody.cli.take_inbox", lambda _id: None)
+    monkeypatch.setattr("embody.cli.post_pose", lambda *_a, **_k: {"ok": True})
     monkeypatch.setattr("embody.cli.post_show", fake_post)
     monkeypatch.setattr("embody.cli.time.sleep", fake_sleep)
     capsys.readouterr()
@@ -1032,14 +1041,16 @@ def test_push_watch_401_does_not_retry(
     _mark_running()
     sleeps: list[float] = []
 
-    def fake_document(body):
+    def fake_document(body, **_kwargs):
         return {"ok": True, "show": {"id": body.id}}
 
     def fake_post(_document):
         raise PushError("embody web push failed (401): ACN bearer required")
 
     monkeypatch.setattr("embody.cli.push_document", fake_document)
+    monkeypatch.setattr("embody.cli.live_show", lambda body: fake_document(body)["show"])
     monkeypatch.setattr("embody.cli.take_inbox", lambda _id: None)
+    monkeypatch.setattr("embody.cli.post_pose", lambda *_a, **_k: {"ok": True})
     monkeypatch.setattr("embody.cli.post_show", fake_post)
     monkeypatch.setattr("embody.cli.time.sleep", sleeps.append)
     assert main(["push", "--watch", "--body", "duck-1"]) == 1
@@ -1097,5 +1108,8 @@ def test_push_watch_runs_owner_inbox(
         out = capsys.readouterr().out
         assert '"drove"' in out
         assert '"op": "twist"' in out
+        poses = [row for row in stub.requests if row["path"] == "/api/agent/pose"]
+        assert poses
+        assert poses[0]["body"]["listen"] is True
     finally:
         stub.close()

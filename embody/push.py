@@ -13,6 +13,7 @@ from embody.show import live_show
 
 DEFAULT_PUSH_PATH = "/api/agent/show"
 DEFAULT_INBOX_PATH = "/api/agent/inbox"
+DEFAULT_POSE_PATH = "/api/agent/pose"
 
 
 class PushError(RuntimeError):
@@ -102,3 +103,25 @@ def take_inbox(body_id: str, *, timeout: float = 5.0) -> dict[str, Any] | None:
     payload = _studio_request(url, method="GET", timeout=timeout)
     cmd = payload.get("command")
     return cmd if isinstance(cmd, dict) else None
+
+
+def post_pose(
+    body_id: str,
+    *,
+    numbers: dict[str, Any] | None,
+    numbers_error: str | None = None,
+    listen: bool = True,
+    timeout: float = 5.0,
+) -> dict[str, Any]:
+    token = (body_id or "").strip()
+    if not token:
+        raise PushError("body id required to push pose")
+    payload: dict[str, Any] = {"id": token, "numbers": numbers, "listen": listen}
+    if numbers_error:
+        payload["numbers_error"] = numbers_error[:240]
+    return _studio_request(
+        f"{studio_url()}{DEFAULT_POSE_PATH}",
+        method="POST",
+        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        timeout=timeout,
+    )

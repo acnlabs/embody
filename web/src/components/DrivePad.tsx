@@ -11,6 +11,34 @@ export type DriveRequest =
 const WALK_X = 0.2;
 const WALK_YAW = 0.8;
 
+const MOVE_KEYS = new Set([
+  "w",
+  "a",
+  "s",
+  "d",
+  "arrowup",
+  "arrowdown",
+  "arrowleft",
+  "arrowright",
+]);
+
+function typingIn(target: EventTarget | null): boolean {
+  const el = target as HTMLElement | null;
+  if (!el) return false;
+  const tag = el.tagName;
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el.isContentEditable;
+}
+
+function twistFromKeys(down: Set<string>): { x: number; y: number; yaw: number } {
+  const x =
+    (down.has("w") || down.has("arrowup") ? WALK_X : 0) +
+    (down.has("s") || down.has("arrowdown") ? -WALK_X : 0);
+  const yaw =
+    (down.has("a") || down.has("arrowleft") ? WALK_YAW : 0) +
+    (down.has("d") || down.has("arrowright") ? -WALK_YAW : 0);
+  return { x, y: 0, yaw };
+}
+
 function HoldButton({
   label,
   disabled,
@@ -74,10 +102,59 @@ export default function DrivePad({
   const armed = Boolean(body.session_running && body.drive_listening);
   const name = body.name || body.id;
   const episodic = (body.cards || []).filter((card) => card.mode === "episodic");
+  const sendRef = useRef(send);
+  sendRef.current = send;
 
   const dispatch = (cmd: DriveRequest) => {
-    void send(cmd).then((message) => setErr(message || ""));
+    void sendRef.current(cmd).then((message) => setErr(message || ""));
   };
+
+  useEffect(() => {
+    if (!armed) return;
+    const down = new Set<string>();
+    let timer = 0;
+    const pulse = () => {
+      const twist = twistFromKeys(down);
+      if (twist.x || twist.yaw) void sendRef.current({ twist });
+    };
+    const onDown = (ev: KeyboardEvent) => {
+      if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
+      if (typingIn(ev.target)) return;
+      const k = ev.key.toLowerCase();
+      if (k === " " || MOVE_KEYS.has(k)) ev.preventDefault();
+      if (k === " ") {
+        down.clear();
+        if (timer) {
+          window.clearInterval(timer);
+          timer = 0;
+        }
+        void sendRef.current({ halt: true });
+        return;
+      }
+      if (!MOVE_KEYS.has(k) || ev.repeat) return;
+      down.add(k);
+      pulse();
+      if (!timer) timer = window.setInterval(pulse, 200);
+    };
+    const onUp = (ev: KeyboardEvent) => {
+      const k = ev.key.toLowerCase();
+      if (!MOVE_KEYS.has(k)) return;
+      down.delete(k);
+      if (down.size === 0 && timer) {
+        window.clearInterval(timer);
+        timer = 0;
+        void sendRef.current({ halt: true });
+      }
+    };
+    window.addEventListener("keydown", onDown);
+    window.addEventListener("keyup", onUp);
+    return () => {
+      window.removeEventListener("keydown", onDown);
+      window.removeEventListener("keyup", onUp);
+      if (timer) window.clearInterval(timer);
+      if (down.size) void sendRef.current({ halt: true });
+    };
+  }, [armed]);
 
   let hint = "";
   if (!body.session_running) {
@@ -95,6 +172,12 @@ export default function DrivePad({
             label="前进"
             disabled={!armed}
             onHold={() => dispatch({ twist: { x: WALK_X, y: 0, yaw: 0 } })}
+            onRelease={() => dispatch({ halt: true })}
+          />
+          <HoldButton
+            label="后退"
+            disabled={!armed}
+            onHold={() => dispatch({ twist: { x: -WALK_X, y: 0, yaw: 0 } })}
             onRelease={() => dispatch({ halt: true })}
           />
           <HoldButton
@@ -118,7 +201,11 @@ export default function DrivePad({
             停
           </button>
         </div>
-        {hint ? <p className="sub">{hint}</p> : <p className="sub">人开 · agent 也能开 · 后到的指令赢</p>}
+        {hint ? (
+          <p className="sub">{hint}</p>
+        ) : (
+          <p className="sub">WASD 走转 · 空格停 · 拖画布转视角 · 后到的指令赢</p>
+        )}
         {err ? <p className="warn">{err}</p> : null}
       </div>
       {episodic.length ? (

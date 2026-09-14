@@ -2,12 +2,17 @@ import { mkdirSync, readFileSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import type { DriveCmd } from "@/lib/drive";
 import { isDriveFresh } from "@/lib/drive";
-import type { BodyShow } from "@/lib/types";
+import type { BodyPose, BodyShow } from "@/lib/types";
 
-type Ledger = { bodies: Record<string, BodyShow>; inboxes?: Record<string, DriveCmd> };
+type Ledger = {
+  bodies: Record<string, BodyShow>;
+  inboxes?: Record<string, DriveCmd>;
+  poses?: Record<string, BodyPose>;
+};
 
 const KV_KEY = "embody:bodies";
 const INBOX_KEY = "embody:inbox";
+const POSE_KEY = "embody:pose";
 
 function kvCreds(): { url: string; token: string } | null {
   const url = (process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL)?.trim();
@@ -131,6 +136,25 @@ export async function putDrive(id: string, cmd: DriveCmd): Promise<void> {
   writeFile(ledger);
 }
 
+export async function putPose(id: string, pose: BodyPose): Promise<void> {
+  if (useKv()) {
+    const client = await kv();
+    await client.hset(POSE_KEY, { [id]: pose });
+    return;
+  }
+  const ledger = readFile();
+  ledger.poses = { ...ledger.poses, [id]: pose };
+  writeFile(ledger);
+}
+
+export async function getPose(id: string): Promise<BodyPose | null> {
+  if (useKv()) {
+    const client = await kv();
+    return (await client.hget<BodyPose>(POSE_KEY, id)) ?? null;
+  }
+  return readFile().poses?.[id] ?? null;
+}
+
 export async function takeDrive(id: string): Promise<DriveCmd | null> {
   if (useKv()) {
     const client = await kv();
@@ -164,11 +188,13 @@ export async function deleteBody(id: string): Promise<BodyShow | null> {
     const client = await kv();
     await client.hdel(KV_KEY, id);
     await client.hdel(INBOX_KEY, id);
+    await client.hdel(POSE_KEY, id);
     return existing;
   }
   const ledger = readFile();
   delete ledger.bodies[id];
   if (ledger.inboxes) delete ledger.inboxes[id];
+  if (ledger.poses) delete ledger.poses[id];
   writeFile(ledger);
   return existing;
 }

@@ -25,3 +25,9 @@ export type BodyShow = {
   drive_listen_at?: string;
   drive_listening?: boolean;
 };
+
+export type BodyPose = {
+  numbers: Record<string, unknown> | null;
+  numbers_error?: string;
+  at: string;
+};

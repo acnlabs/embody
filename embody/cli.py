@@ -34,7 +34,7 @@ from embody.models import (
     validate_origin,
 )
 from embody.join import JoinError, join_body, leave_body, studio_configured
-from embody.push import PushError, post_show, push_document, take_inbox, transient_push_error
+from embody.push import PushError, post_pose, post_show, push_document, take_inbox, transient_push_error
 from embody.show import body_card, live_show, public_runtime_error, show_for
 from embody.studio import DEFAULT_BIND, DEFAULT_PORT, serve as serve_studio
 from embody.store import load, save
@@ -802,10 +802,23 @@ def cmd_push_watch(args: argparse.Namespace) -> int:
                             else str(exc),
                         }
                     )
+            show = live_show(body)
+            try:
+                post_pose(
+                    body.id,
+                    numbers=show.get("numbers") if isinstance(show.get("numbers"), dict) else None,
+                    numbers_error=show.get("numbers_error")
+                    if isinstance(show.get("numbers_error"), str)
+                    else None,
+                    listen=True,
+                )
+            except PushError as exc:
+                if not transient_push_error(exc):
+                    raise CliError(str(exc)) from exc
             now = time.monotonic()
             due = last_push == 0.0 or (now - last_push) >= interval or not running
             if due:
-                document = push_document(body)
+                document = push_document(body, show=show)
                 document["listen"] = True
                 try:
                     remote = post_show(document)
@@ -1029,7 +1042,7 @@ def build_parser() -> argparse.ArgumentParser:
     pushed.add_argument(
         "--watch",
         action="store_true",
-        help="keep pushing Show snapshots and run owner-page drive commands (Ctrl+C stops watching, not the sim)",
+        help="keep pushing Show snapshots, stream pose, and run owner-page drive commands (Ctrl+C stops watching, not the sim)",
     )
     pushed.add_argument(
         "--interval",

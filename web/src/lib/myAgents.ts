@@ -8,10 +8,14 @@ function chatApiOrigin(): string {
 
 export type MyAgent = { id: string; name: string };
 
+const myAgentsCache = new Map<string, { agents: MyAgent[]; exp: number }>();
+
 /** Identity only: which agents this Auth0 human owns. Not a body ledger. */
 export async function fetchMyAgents(bearer: string): Promise<MyAgent[] | null> {
   const token = bearer.trim();
   if (!token) return null;
+  const hit = myAgentsCache.get(token);
+  if (hit && hit.exp > Date.now()) return hit.agents;
   try {
     const res = await fetch(`${chatApiOrigin()}/api/chat/my-agents?limit=50`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -20,7 +24,7 @@ export async function fetchMyAgents(bearer: string): Promise<MyAgent[] | null> {
     if (!res.ok) return null;
     const data = (await res.json()) as { agents?: unknown };
     const rows = Array.isArray(data.agents) ? data.agents : [];
-    return rows
+    const agents = rows
       .map((raw) => {
         const row = raw as { agent_id?: unknown; id?: unknown; name?: unknown };
         const id = String(row.agent_id ?? row.id ?? "").replace(/^acn:/, "");
@@ -28,6 +32,8 @@ export async function fetchMyAgents(bearer: string): Promise<MyAgent[] | null> {
         return { id, name: String(row.name ?? "").trim() || id };
       })
       .filter((row): row is MyAgent => row != null);
+    myAgentsCache.set(token, { agents, exp: Date.now() + 30_000 });
+    return agents;
   } catch {
     return null;
   }

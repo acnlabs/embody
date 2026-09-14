@@ -177,8 +177,9 @@ function BuildSection({ build }: { build: Record<string, unknown> }) {
 function stageCaption(body: BodyShow, hasJoints: boolean): string {
   if (body.numbers_error) return "仿真在本机 · 这次没读到关节";
   if (!hasJoints) {
-    return body.session_running ? "仿真在本机 · 等待下一帧 push" : "仿真在本机";
+    return body.session_running ? "仿真在本机 · 等待关节流" : "仿真在本机";
   }
+  if (body.drive_listening) return "仿真在本机 · WASD 开车 · 拖动转视角";
   return "仿真在本机 · 人开 · agent 也能开";
 }
 
@@ -278,6 +279,10 @@ export function RoomView({
 function SignedRoom({ bodyId }: { bodyId: string }) {
   const auth = useAuth0();
   const [body, setBody] = useState<BodyShow | null>(null);
+  const [poseLive, setPoseLive] = useState<{
+    numbers: Record<string, unknown> | null;
+    numbers_error?: string;
+  } | null>(null);
   const [err, setErr] = useState("");
 
   useEffect(() => {
@@ -310,6 +315,38 @@ function SignedRoom({ bodyId }: { bodyId: string }) {
     };
   }, [auth.isAuthenticated, auth.getAccessTokenSilently, bodyId]);
 
+  useEffect(() => {
+    if (!auth.isAuthenticated || !body?.session_running) {
+      setPoseLive(null);
+      return;
+    }
+    let cancel = false;
+    const tick = async () => {
+      try {
+        const token = await auth.getAccessTokenSilently({
+          authorizationParams: { audience: AUTH0_AUDIENCE },
+        });
+        const res = await fetch(`/api/show/${encodeURIComponent(bodyId)}/pose`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const json = (await res.json()) as {
+          numbers?: Record<string, unknown> | null;
+          numbers_error?: string;
+        };
+        if (cancel || !res.ok) return;
+        setPoseLive({ numbers: json.numbers ?? null, numbers_error: json.numbers_error });
+      } catch {
+        /* keep last frame */
+      }
+    };
+    void tick();
+    const timer = setInterval(() => void tick(), 200);
+    return () => {
+      cancel = true;
+      clearInterval(timer);
+    };
+  }, [auth.isAuthenticated, auth.getAccessTokenSilently, bodyId, body?.session_running]);
+
   if (auth.isLoading) return <p className="meta">登录状态读取中…</p>;
   if (!auth.isAuthenticated) {
     return (
@@ -340,6 +377,9 @@ function SignedRoom({ bodyId }: { bodyId: string }) {
     );
   }
   if (!body) return <p className="meta">读取身体…</p>;
+  const view: BodyShow = poseLive
+    ? { ...body, numbers: poseLive.numbers, numbers_error: poseLive.numbers_error }
+    : body;
   const send = async (cmd: DriveRequest): Promise<string | null> => {
     try {
       const token = await auth.getAccessTokenSilently({
@@ -360,7 +400,7 @@ function SignedRoom({ bodyId }: { bodyId: string }) {
       return exc instanceof Error ? exc.message : "drive failed";
     }
   };
-  return <RoomView body={body} send={send} />;
+  return <RoomView body={view} send={send} />;
 }
 
 export default function BodyRoom({ bodyId }: { bodyId: string }) {

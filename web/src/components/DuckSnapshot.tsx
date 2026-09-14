@@ -34,7 +34,7 @@ export default function DuckSnapshot({ pose }: { pose: DuckPose }) {
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       renderer.shadowMap.enabled = true;
       renderer.domElement.setAttribute("role", "img");
-      renderer.domElement.setAttribute("aria-label", "身体姿势快照，拖动可转视角");
+      renderer.domElement.setAttribute("aria-label", "身体姿势，拖动转视角，WASD 开车");
       host.appendChild(renderer.domElement);
 
       scene.add(new THREE.HemisphereLight(0xfbf9f4, 0xb9c4cf, 1.1));
@@ -75,6 +75,8 @@ export default function DuckSnapshot({ pose }: { pose: DuckPose }) {
       orbit.minDistance = Math.max(0.08, size * 0.35);
       orbit.maxDistance = Math.max(0.9, size * 4);
       orbit.target.copy(center);
+      const keyed = orbit as { enableKeys?: boolean };
+      if ("enableKeys" in keyed) keyed.enableKeys = false;
       orbit.update();
       controls = orbit;
 
