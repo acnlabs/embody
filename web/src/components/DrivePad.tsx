@@ -155,12 +155,7 @@ export default function DrivePad({
     };
   }, [armed]);
 
-  let hint = "";
-  if (!body.session_running) {
-    hint = "等 agent 接通这场";
-  } else if (!body.drive_listening) {
-    hint = "agent 正在接通这间房…";
-  }
+  const hint = armed ? "" : "还不能开";
 
   return (
     <div className="drive-pad">
@@ -203,7 +198,7 @@ export default function DrivePad({
         {hint ? (
           <p className="sub">{hint}</p>
         ) : (
-          <p className="sub">WASD 走转 · 空格停 · 拖画布转视角 · 后到的指令赢</p>
+          <p className="sub">WASD 走转 · 空格停 · 拖画布转视角</p>
         )}
         {err ? <p className="warn">{err}</p> : null}
       </div>

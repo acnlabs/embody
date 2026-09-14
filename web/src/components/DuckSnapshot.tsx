@@ -34,7 +34,7 @@ export default function DuckSnapshot({ pose }: { pose: DuckPose }) {
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       renderer.shadowMap.enabled = true;
       renderer.domElement.setAttribute("role", "img");
-      renderer.domElement.setAttribute("aria-label", "身体姿势，拖动转视角，WASD 开车");
+      renderer.domElement.setAttribute("aria-label", "身体姿势，拖动转视角");
       host.appendChild(renderer.domElement);
 
       scene.add(new THREE.HemisphereLight(0xfbf9f4, 0xb9c4cf, 1.1));

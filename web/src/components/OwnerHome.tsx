@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useAuth0 } from "@auth0/auth0-react";
 import { useEffect, useState } from "react";
 import { AUTH0_AUDIENCE, AUTH0_CLIENT_ID } from "@/lib/auth0";
+import { originLabel, ownerError, sessionLabel } from "@/lib/copy";
 import type { BodyShow } from "@/lib/types";
 
 type Payload = {
@@ -14,7 +15,7 @@ type Payload = {
 
 function keyNumber(body: BodyShow): string | null {
   const state = body.numbers?.body_state as { tilt_deg?: number } | undefined;
-  if (typeof state?.tilt_deg === "number") return `tilt ${state.tilt_deg.toFixed(1)}°`;
+  if (typeof state?.tilt_deg === "number") return `倾斜 ${state.tilt_deg.toFixed(1)}°`;
   return null;
 }
 
@@ -37,13 +38,14 @@ function ModuleChips({ body }: { body: BodyShow }) {
 
 export function BodyCard({ body }: { body: BodyShow }) {
   const key = keyNumber(body);
+  const tricks = body.cards?.length || 0;
   return (
     <article className="body-card">
       <Link href={`/b/${body.id}`}>
         <div className="body-cover">
           <span className="badge">{body.kind}</span>
           <span className={`status${body.session_running ? " on" : ""}`}>
-            {body.session_running ? "会话中" : "待机"}
+            {sessionLabel(body.session_running)}
           </span>
           <span className="title">{body.name || body.id}</span>
           {key ? <span className="keynum">{key}</span> : null}
@@ -54,7 +56,8 @@ export function BodyCard({ body }: { body: BodyShow }) {
           <Link href={`/b/${body.id}`}>{body.name || body.id}</Link>
         </h3>
         <p className="meta">
-          {body.origin} · agent {body.bound_agent_id.slice(0, 8)}… · {body.cards?.length || 0} 张卡
+          {originLabel(body.origin)}
+          {tricks ? ` · ${tricks} 个招式` : ""}
         </p>
         <ModuleChips body={body} />
       </div>
@@ -65,11 +68,8 @@ export function BodyCard({ body }: { body: BodyShow }) {
 function SetupHint() {
   return (
     <div className="empty">
-      <h3>缺少 Auth0 client</h3>
-      <p>
-        和 ComicLaw 同租户，用 Embody 自己的 SPA client。在 <code>web/.env.local</code> 写{" "}
-        <code>NEXT_PUBLIC_AUTH0_CLIENT_ID</code>，回调 <code>/auth/callback</code>。
-      </p>
+      <h3>还不能登录</h3>
+      <p>这间房暂时打不开。</p>
     </div>
   );
 }
@@ -94,11 +94,11 @@ function SignedHome() {
         });
         const json = (await res.json()) as Payload;
         if (!cancel) {
-          if (!res.ok) setErr(json.error || res.statusText);
+          if (!res.ok) setErr(ownerError(json.error || res.statusText));
           else setData(json);
         }
       } catch (exc) {
-        if (!cancel) setErr(exc instanceof Error ? exc.message : "load failed");
+        if (!cancel) setErr(exc instanceof Error ? ownerError(exc.message) : "加载失败。");
       } finally {
         if (!cancel) setLoading(false);
       }
@@ -115,11 +115,11 @@ function SignedHome() {
   if (!auth.isAuthenticated) {
     return (
       <div className="empty">
-        <h3>给 agent 的 owner 看</h3>
-        <p>agent 开车，协作在 ACN。这里不搜 Hub、不拉工单、不发关节。</p>
+        <h3>看你的身体</h3>
+        <p>登录后可以看，开着的时候你也能开。</p>
         <p style={{ marginTop: "1.2rem" }}>
           <button type="button" className="primary" onClick={() => auth.loginWithRedirect()}>
-            用 Auth0 登录
+            登录
           </button>
         </p>
       </div>
@@ -133,27 +133,8 @@ function SignedHome() {
       {err ? <p className="warn">{err}</p> : null}
       {!loading && !err && !rows.length ? (
         <div className="empty">
-          <h3>还没有身体推上来</h3>
-          <p>
-            本机 <code>bind</code> 的必须是你的 agent，再 <code>embody push</code>（
-            <code>EMBODY_STUDIO_URL</code> 指向这里）。
-          </p>
-          <pre>
-            <code>{`python3 -m embody bind --body duck-1
-python3 -m embody push --body duck-1`}</code>
-          </pre>
-          {data?.agents?.length ? (
-            <>
-              <p className="meta">你的 agent</p>
-              <ul>
-                {data.agents.map((agent) => (
-                  <li key={agent.id}>
-                    {agent.name} · <code>{agent.id}</code>
-                  </li>
-                ))}
-              </ul>
-            </>
-          ) : null}
+          <h3>还没有身体</h3>
+          <p>身体出现在这里之后，你就能看、也能开。</p>
         </div>
       ) : null}
       {rows.length ? (

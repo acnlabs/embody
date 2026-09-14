@@ -4,6 +4,7 @@ import { useAuth0 } from "@auth0/auth0-react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { AUTH0_CLIENT_ID } from "@/lib/auth0";
+import { ownerError } from "@/lib/copy";
 
 function CallbackWait() {
   const router = useRouter();
@@ -21,9 +22,7 @@ function CallbackWait() {
     return (
       <main className="meta" style={{ padding: "2rem" }}>
         <h3>登录失败</h3>
-        <p>
-          <code>{error.message}</code>
-        </p>
+        <p>{ownerError(error.message)}</p>
         <p>
           <a href="/">返回首页</a>
         </p>
@@ -36,7 +35,7 @@ function CallbackWait() {
 
 export default function AuthCallbackPage() {
   if (!AUTH0_CLIENT_ID) {
-    return <main className="meta">Auth0 未配置。</main>;
+    return <main className="meta">还不能登录。</main>;
   }
   return <CallbackWait />;
 }

@@ -5,7 +5,7 @@ export default function Page() {
     <main>
       <div className="page-head">
         <h2>身体</h2>
-        <p className="meta">agent 开一场，人和 agent 都能从房间开。</p>
+        <p className="meta">看你的身体，开着的时候你也能开。</p>
       </div>
       <OwnerHome />
     </main>

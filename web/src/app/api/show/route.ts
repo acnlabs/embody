@@ -1,3 +1,4 @@
+import { OWNER_ERR } from "@/lib/copy";
 import { listBodiesForAgents } from "@/lib/ledger";
 import { fetchMyAgents } from "@/lib/myAgents";
 import { extractBearerToken, verifyUserToken } from "@/lib/userAuth";
@@ -7,12 +8,12 @@ export const runtime = "nodejs";
 export async function GET(req: Request) {
   const sub = await verifyUserToken(req);
   if (!sub) {
-    return Response.json({ ok: false, error: "owner Auth0 token required" }, { status: 401 });
+    return Response.json({ ok: false, error: OWNER_ERR.login }, { status: 401 });
   }
   const bearer = extractBearerToken(req);
   const mine = bearer ? await fetchMyAgents(bearer) : null;
   if (mine == null) {
-    return Response.json({ ok: false, error: "could not read my-agents" }, { status: 502 });
+    return Response.json({ ok: false, error: OWNER_ERR.down }, { status: 502 });
   }
   const show = await listBodiesForAgents(mine.map((row) => row.id));
   return Response.json({
@@ -22,7 +23,7 @@ export async function GET(req: Request) {
     owner: sub,
     agents: mine,
     show,
-    note: "Owner rooms. The agent starts a session; you can drive too. Embody does not store task ids.",
+    note: "Owner rooms.",
   });
 }
 

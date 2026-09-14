@@ -4,8 +4,8 @@ import SiteHeader from "@/components/SiteHeader";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Embody · studio",
-  description: "Hosted owner studio. The agent starts a session; you can drive too.",
+  title: "Embody",
+  description: "看你的身体，也能开。",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -15,7 +15,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <AuthProvider>
           <SiteHeader />
           {children}
-          <footer>人开 · agent 也能开 · 开一场就接通 · 不评 fallen</footer>
+          <footer>看 · 也能开</footer>
         </AuthProvider>
       </body>
     </html>

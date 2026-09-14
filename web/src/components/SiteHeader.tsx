@@ -9,7 +9,7 @@ function AuthedActions() {
   if (!auth.isAuthenticated) return null;
   return (
     <div className="topbar-right">
-      <span className="user">{auth.user?.email || auth.user?.name || "owner"}</span>
+      <span className="user">{auth.user?.email || auth.user?.name || "你"}</span>
       <button
         type="button"
         onClick={() => auth.logout({ logoutParams: { returnTo: window.location.origin } })}
@@ -29,7 +29,7 @@ export default function SiteHeader() {
         </div>
         <nav className="menu" aria-label="Embody">
           <span className="menu-item active" aria-current="page">
-            studio
+            身体
           </span>
         </nav>
         {AUTH0_CLIENT_ID ? <AuthedActions /> : null}

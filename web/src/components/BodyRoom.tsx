@@ -7,6 +7,7 @@ import { AUTH0_AUDIENCE, AUTH0_CLIENT_ID } from "@/lib/auth0";
 import DuckSnapshot from "@/components/DuckSnapshot";
 import DrivePad, { type DriveRequest } from "@/components/DrivePad";
 import { poseFromNumbers } from "@/lib/duckPose";
+import { buildKeyLabel, cardModeLabel, originLabel, ownerError, sessionLabel } from "@/lib/copy";
 import type { BodyShow, Card } from "@/lib/types";
 
 function fmtAgo(iso?: string): string {
@@ -26,8 +27,8 @@ function num(v: unknown, digits: number): string {
 }
 
 function shortNumbersError(raw: string): string {
-  if (/Traceback|Connection refused|Errno 61/i.test(raw)) {
-    return "本机仿真连不上。等 agent 再开一场。";
+  if (/Traceback|Connection refused|Errno 61|not listening|8765|session start/i.test(raw)) {
+    return "身体连不上了。";
   }
   return raw.length > 240 ? `${raw.slice(0, 240)}…` : raw;
 }
@@ -52,8 +53,8 @@ function Telemetry({ body }: { body: BodyShow }) {
     return (
       <div className="telemetry">
         <div className="stat">
-          <div className="label">遥测</div>
-          <p className="warn">数字读不到：{shortNumbersError(body.numbers_error)}</p>
+          <div className="label">状态</div>
+          <p className="warn">{shortNumbersError(body.numbers_error)}</p>
         </div>
       </div>
     );
@@ -62,9 +63,9 @@ function Telemetry({ body }: { body: BodyShow }) {
     return (
       <div className="telemetry">
         <div className="stat">
-          <div className="label">遥测</div>
+          <div className="label">状态</div>
           <p className="sub" style={{ marginTop: "0.4rem" }}>
-            还没有实时数字。等 agent 接通这场。
+            还没有实时数字。
           </p>
         </div>
       </div>
@@ -73,21 +74,21 @@ function Telemetry({ body }: { body: BodyShow }) {
   return (
     <div className="telemetry">
       <div className="stat">
-        <div className="label">policy</div>
+        <div className="label">步态</div>
         <div className="value" style={{ fontSize: "1.05rem" }}>
           {String(n.policy || "—")}
         </div>
         {typeof n.behavior === "string" ? <div className="sub">正在 {n.behavior}</div> : null}
       </div>
       <div className="stat">
-        <div className="label">tilt_deg</div>
+        <div className="label">倾斜</div>
         <div className="value">
           {num(state.tilt_deg, 2)}
           <span className="unit">°</span>
         </div>
       </div>
       <div className="stat">
-        <div className="label">trunk_z</div>
+        <div className="label">高度</div>
         <div className="value">
           {num(state.trunk_z_m, 3)}
           <span className="unit">m</span>
@@ -99,7 +100,7 @@ function Telemetry({ body }: { body: BodyShow }) {
           <Foot side="L" contact={feet.left?.contact} />
           <Foot side="R" contact={feet.right?.contact} />
         </div>
-        <div className="sub">只报数字，不评 fallen</div>
+        <div className="sub">左右脚有没有着地</div>
       </div>
     </div>
   );
@@ -126,7 +127,7 @@ function BuildValue({ value }: { value: unknown }) {
       <div className="build-nested">
         {entries.map(([key, nested]) => (
           <div className="build-row" key={key}>
-            <span className="build-key">{key}</span>
+            <span className="build-key">{buildKeyLabel(key)}</span>
             <BuildValue value={nested} />
           </div>
         ))}
@@ -145,17 +146,17 @@ function BuildSection({ build }: { build: Record<string, unknown> }) {
   const moduleEntries = Object.entries(modules);
   return (
     <>
-      <h3 className="cards-head">配置 · 这台身体的装配</h3>
+      <h3 className="cards-head">这台的配置</h3>
       <div className="build-panel">
         {extras.map(([key, value]) => (
           <div className="build-row" key={key}>
-            <span className="build-key">{key}</span>
+            <span className="build-key">{buildKeyLabel(key)}</span>
             <BuildValue value={value} />
           </div>
         ))}
         {moduleEntries.length ? (
           <div className="build-row">
-            <span className="build-key">modules</span>
+            <span className="build-key">{buildKeyLabel("modules")}</span>
             <span className="module-list">
               {moduleEntries.map(([name, value]) => (
                 <span
@@ -175,12 +176,10 @@ function BuildSection({ build }: { build: Record<string, unknown> }) {
 }
 
 function stageCaption(body: BodyShow, hasJoints: boolean): string {
-  if (body.numbers_error) return "仿真在本机 · 这次没读到关节";
-  if (!hasJoints) {
-    return body.session_running ? "等 agent 接通关节" : "仿真在本机";
-  }
-  if (body.drive_listening) return "仿真在本机 · WASD 开车 · 拖动转视角";
-  return "仿真在本机 · 人开 · agent 也能开";
+  if (body.numbers_error) return "还没跟上";
+  if (!hasJoints) return body.session_running ? "还没动起来" : "还没开始";
+  if (body.drive_listening) return "WASD 开车 · 拖动转视角";
+  return "拖动转视角";
 }
 
 function MainStage({ body }: { body: BodyShow }) {
@@ -191,16 +190,17 @@ function MainStage({ body }: { body: BodyShow }) {
       {isMicroduck ? (
         <DuckSnapshot pose={pose} />
       ) : (
-        <p className="stage-empty">还没有 {body.kind} 的外形。kind 有官方网格后再挂到这间房。</p>
+        <p className="stage-empty">还没有这只身体的外形。</p>
       )}
       <p className="stage-caption">
-        {isMicroduck ? stageCaption(body, pose.hasJoints) : "仿真在本机"}
+        {isMicroduck ? stageCaption(body, pose.hasJoints) : "还没有外形"}
       </p>
     </div>
   );
 }
 
 function SkillCard({ card }: { card: Card }) {
+  const mode = cardModeLabel(card.mode);
   return (
     <article className="skill-card">
       <div className="skill-preview">
@@ -213,10 +213,7 @@ function SkillCard({ card }: { card: Card }) {
       <div className="skill-body">
         <div className="alias-row">
           <span className="alias">{card.alias}</span>
-          {card.mode ? <span className="badge">{card.mode}</span> : null}
-        </div>
-        <div className="hub">
-          <a href={`https://huggingface.co/${card.hub}`}>{card.hub}</a>
+          {mode ? <span className="badge">{mode}</span> : null}
         </div>
       </div>
     </article>
@@ -237,16 +234,13 @@ export function RoomView({
         <div className="title-row">
           <h2>{body.name || body.id}</h2>
           <span className="badge">{body.kind}</span>
-          <span className="badge">{body.origin}</span>
+          <span className="badge">{originLabel(body.origin)}</span>
           <span className={`status${body.session_running ? " on" : ""}`}>
-            {body.session_running ? "会话进行中" : "无会话"}
+            {sessionLabel(body.session_running)}
           </span>
         </div>
         <div className="sub">
-          <span>
-            agent <code>{body.bound_agent_id}</code>
-          </span>
-          <span>push {fmtAgo(body.pushed_at)}</span>
+          <span>更新于 {fmtAgo(body.pushed_at)}</span>
         </div>
       </header>
 
@@ -260,7 +254,7 @@ export function RoomView({
 
       {body.build && Object.keys(body.build).length ? <BuildSection build={body.build} /> : null}
 
-      <h3 className="cards-head">招式卡 · {cards.length}</h3>
+      <h3 className="cards-head">招式 · {cards.length}</h3>
       {cards.length ? (
         <div className="skill-grid">
           {cards.map((card) => (
@@ -268,7 +262,7 @@ export function RoomView({
           ))}
         </div>
       ) : (
-        <p className="meta">还没有卡。agent 在本机 attach 技能后再 push。</p>
+        <p className="meta">还没有招式。</p>
       )}
     </>
   );
@@ -296,13 +290,13 @@ function SignedRoom({ bodyId }: { bodyId: string }) {
         });
         const json = (await res.json()) as { show?: BodyShow; error?: string };
         if (cancel) return;
-        if (!res.ok) setErr(json.error || res.statusText);
+        if (!res.ok) setErr(ownerError(json.error || res.statusText));
         else {
           setErr("");
           setBody(json.show || null);
         }
       } catch (exc) {
-        if (!cancel) setErr(exc instanceof Error ? exc.message : "load failed");
+        if (!cancel) setErr(exc instanceof Error ? ownerError(exc.message) : "加载失败。");
       }
     };
     void tick();
@@ -349,15 +343,15 @@ function SignedRoom({ bodyId }: { bodyId: string }) {
   if (!auth.isAuthenticated) {
     return (
       <div className="empty">
-        <h3>这间房只给 owner 看</h3>
-        <p>登录后确认这具身体属于你的 agent。</p>
+        <h3>登录后才能看</h3>
+        <p>这间房里的身体只给你看。</p>
         <p style={{ marginTop: "1.2rem" }}>
           <button
             type="button"
             className="primary"
             onClick={() => auth.loginWithRedirect({ appState: { returnTo: `/b/${bodyId}` } })}
           >
-            用 Auth0 登录
+            登录
           </button>
         </p>
       </div>
@@ -367,7 +361,7 @@ function SignedRoom({ bodyId }: { bodyId: string }) {
     return (
       <div className="empty">
         <h3>打不开这间房</h3>
-        <p className="warn">{err}</p>
+        <p className="warn">{ownerError(err)}</p>
         <p className="meta">
           <Link href="/">回到全部身体</Link>
         </p>
@@ -392,10 +386,10 @@ function SignedRoom({ bodyId }: { bodyId: string }) {
         body: JSON.stringify(cmd),
       });
       const json = (await res.json()) as { error?: string };
-      if (!res.ok) return json.error || res.statusText;
+      if (!res.ok) return ownerError(json.error || res.statusText);
       return null;
     } catch (exc) {
-      return exc instanceof Error ? exc.message : "drive failed";
+      return exc instanceof Error ? ownerError(exc.message) : "现在开不了。";
     }
   };
   return <RoomView body={view} send={send} />;
@@ -403,7 +397,7 @@ function SignedRoom({ bodyId }: { bodyId: string }) {
 
 export default function BodyRoom({ bodyId }: { bodyId: string }) {
   if (!AUTH0_CLIENT_ID) {
-    return <div className="empty">先配置 Auth0 SPA，才能打开这间房。</div>;
+    return <div className="empty">还不能打开这间房。</div>;
   }
   return <SignedRoom bodyId={bodyId} />;
 }
