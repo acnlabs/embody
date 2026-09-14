@@ -7,7 +7,7 @@ import { AUTH0_AUDIENCE, AUTH0_CLIENT_ID } from "@/lib/auth0";
 import DuckSnapshot from "@/components/DuckSnapshot";
 import { originLabel, ownerError, sessionLabel, agentLabel } from "@/lib/copy";
 import { poseFromNumbers } from "@/lib/duckPose";
-import { useI18n } from "@/lib/i18n";
+import { useI18n, type Translate } from "@/lib/i18n";
 import type { BodyShow } from "@/lib/types";
 
 type Payload = {
@@ -16,8 +16,11 @@ type Payload = {
   error?: string;
 };
 
-function keyNumber(body: BodyShow, t: (path: string, vars?: Record<string, string | number>) => string): string | null {
-  const state = body.numbers?.body_state as { tilt_deg?: number } | undefined;
+function keyNumber(
+  numbers: Record<string, unknown> | null | undefined,
+  t: Translate,
+): string | null {
+  const state = numbers?.body_state as { tilt_deg?: number } | undefined;
   if (typeof state?.tilt_deg === "number") return t("home.tilt", { n: state.tilt_deg.toFixed(1) });
   return null;
 }
@@ -41,10 +44,43 @@ function ModuleChips({ body }: { body: BodyShow }) {
 }
 
 export function BodyCard({ body }: { body: BodyShow }) {
+  const auth = useAuth0();
   const { t } = useI18n();
-  const key = keyNumber(body, t);
+  const [live, setLive] = useState<Record<string, unknown> | null>(null);
   const tricks = body.cards?.length || 0;
-  const pose = poseFromNumbers(body.numbers ?? null);
+
+  useEffect(() => {
+    if (!body.session_running || body.kind !== "microduck") {
+      setLive(null);
+      return;
+    }
+    let cancel = false;
+    const tick = async () => {
+      try {
+        const token = await auth.getAccessTokenSilently({
+          authorizationParams: { audience: AUTH0_AUDIENCE },
+        });
+        const res = await fetch(`/api/show/${encodeURIComponent(body.id)}/pose`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (cancel || !res.ok) return;
+        const json = (await res.json()) as { numbers?: Record<string, unknown> | null };
+        if (!cancel) setLive(json.numbers ?? null);
+      } catch {
+        /* keep last frame */
+      }
+    };
+    void tick();
+    const timer = window.setInterval(() => void tick(), 1000);
+    return () => {
+      cancel = true;
+      window.clearInterval(timer);
+    };
+  }, [auth.getAccessTokenSilently, body.id, body.kind, body.session_running]);
+
+  const numbers = live ?? body.numbers ?? null;
+  const pose = poseFromNumbers(numbers);
+  const key = keyNumber(numbers, t);
   return (
     <article className="body-card">
       <Link href={`/b/${body.id}`}>
@@ -93,8 +129,9 @@ function SignedHome() {
   useEffect(() => {
     if (!auth.isAuthenticated) return;
     let cancel = false;
-    setLoading(true);
-    (async () => {
+    let first = true;
+    const tick = async () => {
+      if (first) setLoading(true);
       try {
         const token = await auth.getAccessTokenSilently({
           authorizationParams: { audience: AUTH0_AUDIENCE },
@@ -104,17 +141,25 @@ function SignedHome() {
         });
         const json = (await res.json()) as Payload;
         if (!cancel) {
-          if (!res.ok) setErr(ownerError(json.error || res.statusText, t));
-          else setData(json);
+          if (!res.ok) {
+            if (first) setErr(ownerError(json.error || res.statusText, t));
+          } else {
+            setErr("");
+            setData(json);
+          }
         }
       } catch (exc) {
-        if (!cancel) setErr(exc instanceof Error ? ownerError(exc.message, t) : t("error.load"));
+        if (!cancel && first) setErr(exc instanceof Error ? ownerError(exc.message, t) : t("error.load"));
       } finally {
-        if (!cancel) setLoading(false);
+        if (!cancel && first) setLoading(false);
+        first = false;
       }
-    })();
+    };
+    void tick();
+    const timer = window.setInterval(() => void tick(), 4000);
     return () => {
       cancel = true;
+      window.clearInterval(timer);
     };
   }, [auth.isAuthenticated, auth.getAccessTokenSilently, t]);
 
