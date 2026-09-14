@@ -142,6 +142,36 @@ button.primary {
 
 button.primary:hover { filter: brightness(1.05); color: #fff; }
 
+.lang-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+button.lang-btn {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 0.28rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+button.lang-btn + button.lang-btn { border-left: 1px solid var(--line); }
+
+button.lang-btn.on {
+  background: var(--ink);
+  color: var(--paper-2);
+}
+
+button.lang-btn:hover { border-color: transparent; color: var(--accent); }
+button.lang-btn.on:hover { color: var(--paper-2); }
+
 /* ---------- Page ---------- */
 main { max-width: 76rem; margin: 0 auto; padding: 2rem 1rem 4rem; }
 @media (min-width: 640px) { main { padding: 2rem 1.5rem 4rem; } }

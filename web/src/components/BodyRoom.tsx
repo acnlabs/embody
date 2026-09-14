@@ -7,41 +7,39 @@ import { AUTH0_AUDIENCE, AUTH0_CLIENT_ID } from "@/lib/auth0";
 import DuckSnapshot from "@/components/DuckSnapshot";
 import DrivePad, { type DriveRequest } from "@/components/DrivePad";
 import { poseFromNumbers } from "@/lib/duckPose";
-import { buildKeyLabel, cardModeLabel, originLabel, ownerError, sessionLabel, agentLabel } from "@/lib/copy";
+import {
+  buildKeyLabel,
+  cardModeLabel,
+  originLabel,
+  ownerError,
+  sessionLabel,
+  agentLabel,
+} from "@/lib/copy";
+import { formatAgo, useI18n, type Translate } from "@/lib/i18n";
 import type { BodyShow, Card } from "@/lib/types";
-
-function fmtAgo(iso?: string): string {
-  if (!iso) return "—";
-  const ms = Date.now() - new Date(iso).getTime();
-  if (!Number.isFinite(ms) || ms < 0) return iso;
-  const min = Math.floor(ms / 60000);
-  if (min < 1) return "刚刚";
-  if (min < 60) return `${min} 分钟前`;
-  const h = Math.floor(min / 60);
-  if (h < 24) return `${h} 小时前`;
-  return `${Math.floor(h / 24)} 天前`;
-}
 
 function num(v: unknown, digits: number): string {
   return typeof v === "number" && Number.isFinite(v) ? v.toFixed(digits) : "—";
 }
 
-function shortNumbersError(raw: string): string {
+function shortNumbersError(raw: string, t: Translate): string {
   if (/Traceback|Connection refused|Errno 61|not listening|8765|session start/i.test(raw)) {
-    return "身体连不上了。";
+    return t("status.down");
   }
   return raw.length > 240 ? `${raw.slice(0, 240)}…` : raw;
 }
 
 function Foot({ side, contact }: { side: string; contact?: boolean }) {
+  const { t } = useI18n();
   return (
     <span className={`foot${contact ? " contact" : ""}`}>
-      {side} {contact ? "接触" : "离地"}
+      {side} {contact ? t("status.contact") : t("status.up")}
     </span>
   );
 }
 
 function Telemetry({ body }: { body: BodyShow }) {
+  const { t } = useI18n();
   const n = body.numbers || {};
   const state = (n.body_state || {}) as {
     tilt_deg?: number;
@@ -53,8 +51,8 @@ function Telemetry({ body }: { body: BodyShow }) {
     return (
       <div className="telemetry">
         <div className="stat">
-          <div className="label">状态</div>
-          <p className="warn">{shortNumbersError(body.numbers_error)}</p>
+          <div className="label">{t("status.label")}</div>
+          <p className="warn">{shortNumbersError(body.numbers_error, t)}</p>
         </div>
       </div>
     );
@@ -63,9 +61,9 @@ function Telemetry({ body }: { body: BodyShow }) {
     return (
       <div className="telemetry">
         <div className="stat">
-          <div className="label">状态</div>
+          <div className="label">{t("status.label")}</div>
           <p className="sub" style={{ marginTop: "0.4rem" }}>
-            还没有实时数字。
+            {t("status.noNumbers")}
           </p>
         </div>
       </div>
@@ -74,49 +72,52 @@ function Telemetry({ body }: { body: BodyShow }) {
   return (
     <div className="telemetry">
       <div className="stat">
-        <div className="label">步态</div>
+        <div className="label">{t("status.gait")}</div>
         <div className="value" style={{ fontSize: "1.05rem" }}>
           {String(n.policy || "—")}
         </div>
-        {typeof n.behavior === "string" ? <div className="sub">正在 {n.behavior}</div> : null}
+        {typeof n.behavior === "string" ? (
+          <div className="sub">{t("status.doing", { name: n.behavior })}</div>
+        ) : null}
       </div>
       <div className="stat">
-        <div className="label">倾斜</div>
+        <div className="label">{t("status.tilt")}</div>
         <div className="value">
           {num(state.tilt_deg, 2)}
           <span className="unit">°</span>
         </div>
       </div>
       <div className="stat">
-        <div className="label">高度</div>
+        <div className="label">{t("status.height")}</div>
         <div className="value">
           {num(state.trunk_z_m, 3)}
           <span className="unit">m</span>
         </div>
       </div>
       <div className="stat">
-        <div className="label">脚接触</div>
+        <div className="label">{t("status.feet")}</div>
         <div className="feet">
           <Foot side="L" contact={feet.left?.contact} />
           <Foot side="R" contact={feet.right?.contact} />
         </div>
-        <div className="sub">左右脚有没有着地</div>
+        <div className="sub">{t("status.footHint")}</div>
       </div>
     </div>
   );
 }
 
-function buildVal(v: unknown): string {
-  if (typeof v === "boolean") return v ? "有" : "无";
+function buildVal(v: unknown, t: Translate): string {
+  if (typeof v === "boolean") return v ? t("build.yes") : t("build.no");
   if (v == null) return "—";
   return String(v);
 }
 
 function BuildValue({ value }: { value: unknown }) {
+  const { t } = useI18n();
   if (Array.isArray(value)) {
     return (
       <span className="build-val">
-        {value.length ? value.map((item) => buildVal(item)).join(", ") : "—"}
+        {value.length ? value.map((item) => buildVal(item, t)).join(", ") : "—"}
       </span>
     );
   }
@@ -127,17 +128,18 @@ function BuildValue({ value }: { value: unknown }) {
       <div className="build-nested">
         {entries.map(([key, nested]) => (
           <div className="build-row" key={key}>
-            <span className="build-key">{buildKeyLabel(key)}</span>
+            <span className="build-key">{buildKeyLabel(key, t)}</span>
             <BuildValue value={nested} />
           </div>
         ))}
       </div>
     );
   }
-  return <span className="build-val">{buildVal(value)}</span>;
+  return <span className="build-val">{buildVal(value, t)}</span>;
 }
 
 function BuildSection({ build }: { build: Record<string, unknown> }) {
+  const { t } = useI18n();
   const modules =
     build.modules && typeof build.modules === "object" && !Array.isArray(build.modules)
       ? (build.modules as Record<string, unknown>)
@@ -146,17 +148,17 @@ function BuildSection({ build }: { build: Record<string, unknown> }) {
   const moduleEntries = Object.entries(modules);
   return (
     <>
-      <h3 className="cards-head">这台的配置</h3>
+      <h3 className="cards-head">{t("build.heading")}</h3>
       <div className="build-panel">
         {extras.map(([key, value]) => (
           <div className="build-row" key={key}>
-            <span className="build-key">{buildKeyLabel(key)}</span>
+            <span className="build-key">{buildKeyLabel(key, t)}</span>
             <BuildValue value={value} />
           </div>
         ))}
         {moduleEntries.length ? (
           <div className="build-row">
-            <span className="build-key">{buildKeyLabel("modules")}</span>
+            <span className="build-key">{buildKeyLabel("modules", t)}</span>
             <span className="module-list">
               {moduleEntries.map(([name, value]) => (
                 <span
@@ -164,7 +166,11 @@ function BuildSection({ build }: { build: Record<string, unknown> }) {
                   className={`badge module${value === false || value == null ? " off" : ""}`}
                 >
                   {name}
-                  {typeof value === "boolean" ? (value ? "" : " 无") : `: ${buildVal(value)}`}
+                  {typeof value === "boolean"
+                    ? value
+                      ? ""
+                      : ` ${t("build.no")}`
+                    : `: ${buildVal(value, t)}`}
                 </span>
               ))}
             </span>
@@ -175,39 +181,41 @@ function BuildSection({ build }: { build: Record<string, unknown> }) {
   );
 }
 
-function stageCaption(body: BodyShow, hasJoints: boolean): string {
-  if (body.numbers_error) return "还没跟上";
-  if (!hasJoints) return body.session_running ? "还没动起来" : "还没开始";
-  if (body.drive_listening) return "WASD 开车 · 拖动转视角";
-  return "拖动转视角";
+function stageCaption(body: BodyShow, hasJoints: boolean, t: Translate): string {
+  if (body.numbers_error) return t("room.captionLag");
+  if (!hasJoints) return body.session_running ? t("room.captionStill") : t("room.captionOff");
+  if (body.drive_listening) return t("room.captionDrive");
+  return t("room.captionOrbit");
 }
 
 function MainStage({ body }: { body: BodyShow }) {
+  const { t } = useI18n();
   const pose = poseFromNumbers(body.numbers ?? null);
   const isMicroduck = body.kind === "microduck";
   return (
     <div className="preview">
       {isMicroduck ? (
-        <DuckSnapshot pose={pose} />
+        <DuckSnapshot pose={pose} ariaLabel={t("room.canvas")} />
       ) : (
-        <p className="stage-empty">还没有这只身体的外形。</p>
+        <p className="stage-empty">{t("room.noMesh")}</p>
       )}
       <p className="stage-caption">
-        {isMicroduck ? stageCaption(body, pose.hasJoints) : "还没有外形"}
+        {isMicroduck ? stageCaption(body, pose.hasJoints, t) : t("room.noFigure")}
       </p>
     </div>
   );
 }
 
 function SkillCard({ card }: { card: Card }) {
-  const mode = cardModeLabel(card.mode);
+  const { t } = useI18n();
+  const mode = cardModeLabel(card.mode, t);
   return (
     <article className="skill-card">
       <div className="skill-preview">
         {card.preview ? (
           <video src={card.preview} controls playsInline preload="metadata" />
         ) : (
-          <div className="no-preview">无预览</div>
+          <div className="no-preview">{t("cards.noPreview")}</div>
         )}
       </div>
       <div className="skill-body">
@@ -227,6 +235,7 @@ export function RoomView({
   body: BodyShow;
   send?: (cmd: DriveRequest) => Promise<string | null>;
 }) {
+  const { t } = useI18n();
   const cards = body.cards || [];
   return (
     <>
@@ -234,14 +243,14 @@ export function RoomView({
         <div className="title-row">
           <h2>{body.name || body.id}</h2>
           <span className="badge">{body.kind}</span>
-          <span className="badge">{originLabel(body.origin)}</span>
+          <span className="badge">{originLabel(body.origin, t)}</span>
           <span className={`status${body.session_running ? " on" : ""}`}>
-            {sessionLabel(body.session_running)}
+            {sessionLabel(body.session_running, t)}
           </span>
         </div>
         <div className="sub">
-          <span title={body.bound_agent_id}>所属 {agentLabel(body)}</span>
-          <span>更新于 {fmtAgo(body.pushed_at)}</span>
+          <span title={body.bound_agent_id}>{t("room.bound", { agent: agentLabel(body) })}</span>
+          <span>{t("room.updated", { ago: formatAgo(body.pushed_at, t) })}</span>
         </div>
       </header>
 
@@ -255,7 +264,7 @@ export function RoomView({
 
       {body.build && Object.keys(body.build).length ? <BuildSection build={body.build} /> : null}
 
-      <h3 className="cards-head">招式 · {cards.length}</h3>
+      <h3 className="cards-head">{t("cards.heading", { n: cards.length })}</h3>
       {cards.length ? (
         <div className="skill-grid">
           {cards.map((card) => (
@@ -263,7 +272,7 @@ export function RoomView({
           ))}
         </div>
       ) : (
-        <p className="meta">还没有招式。</p>
+        <p className="meta">{t("cards.empty")}</p>
       )}
     </>
   );
@@ -271,6 +280,7 @@ export function RoomView({
 
 function SignedRoom({ bodyId }: { bodyId: string }) {
   const auth = useAuth0();
+  const { t } = useI18n();
   const [body, setBody] = useState<BodyShow | null>(null);
   const [poseLive, setPoseLive] = useState<{
     numbers: Record<string, unknown> | null;
@@ -291,13 +301,13 @@ function SignedRoom({ bodyId }: { bodyId: string }) {
         });
         const json = (await res.json()) as { show?: BodyShow; error?: string };
         if (cancel) return;
-        if (!res.ok) setErr(ownerError(json.error || res.statusText));
+        if (!res.ok) setErr(ownerError(json.error || res.statusText, t));
         else {
           setErr("");
           setBody(json.show || null);
         }
       } catch (exc) {
-        if (!cancel) setErr(exc instanceof Error ? ownerError(exc.message) : "加载失败。");
+        if (!cancel) setErr(exc instanceof Error ? ownerError(exc.message, t) : t("error.load"));
       }
     };
     void tick();
@@ -306,7 +316,7 @@ function SignedRoom({ bodyId }: { bodyId: string }) {
       cancel = true;
       clearInterval(timer);
     };
-  }, [auth.isAuthenticated, auth.getAccessTokenSilently, bodyId]);
+  }, [auth.isAuthenticated, auth.getAccessTokenSilently, bodyId, t]);
 
   useEffect(() => {
     if (!auth.isAuthenticated || !body?.session_running) {
@@ -340,19 +350,19 @@ function SignedRoom({ bodyId }: { bodyId: string }) {
     };
   }, [auth.isAuthenticated, auth.getAccessTokenSilently, bodyId, body?.session_running]);
 
-  if (auth.isLoading) return <p className="meta">登录状态读取中…</p>;
+  if (auth.isLoading) return <p className="meta">{t("home.loadingAuth")}</p>;
   if (!auth.isAuthenticated) {
     return (
       <div className="empty">
-        <h3>登录后才能看</h3>
-        <p>这间房里的身体只给你看。</p>
+        <h3>{t("room.signInTitle")}</h3>
+        <p>{t("room.signInHint")}</p>
         <p style={{ marginTop: "1.2rem" }}>
           <button
             type="button"
             className="primary"
             onClick={() => auth.loginWithRedirect({ appState: { returnTo: `/b/${bodyId}` } })}
           >
-            登录
+            {t("nav.signIn")}
           </button>
         </p>
       </div>
@@ -361,15 +371,15 @@ function SignedRoom({ bodyId }: { bodyId: string }) {
   if (err) {
     return (
       <div className="empty">
-        <h3>打不开这间房</h3>
-        <p className="warn">{ownerError(err)}</p>
+        <h3>{t("room.closedTitle")}</h3>
+        <p className="warn">{ownerError(err, t)}</p>
         <p className="meta">
-          <Link href="/">回到全部身体</Link>
+          <Link href="/">{t("room.back")}</Link>
         </p>
       </div>
     );
   }
-  if (!body) return <p className="meta">读取身体…</p>;
+  if (!body) return <p className="meta">{t("room.loading")}</p>;
   const view: BodyShow = poseLive
     ? { ...body, numbers: poseLive.numbers, numbers_error: poseLive.numbers_error }
     : body;
@@ -387,18 +397,33 @@ function SignedRoom({ bodyId }: { bodyId: string }) {
         body: JSON.stringify(cmd),
       });
       const json = (await res.json()) as { error?: string };
-      if (!res.ok) return ownerError(json.error || res.statusText);
+      if (!res.ok) return ownerError(json.error || res.statusText, t);
       return null;
     } catch (exc) {
-      return exc instanceof Error ? ownerError(exc.message) : "现在开不了。";
+      return exc instanceof Error ? ownerError(exc.message, t) : t("error.drive");
     }
   };
   return <RoomView body={view} send={send} />;
 }
 
 export default function BodyRoom({ bodyId }: { bodyId: string }) {
+  const { t } = useI18n();
   if (!AUTH0_CLIENT_ID) {
-    return <div className="empty">还不能打开这间房。</div>;
+    return (
+      <>
+        <p className="meta">
+          <Link href="/">← {t("room.back")}</Link>
+        </p>
+        <div className="empty">{t("room.cantOpen")}</div>
+      </>
+    );
   }
-  return <SignedRoom bodyId={bodyId} />;
+  return (
+    <>
+      <p className="meta">
+        <Link href="/">← {t("room.back")}</Link>
+      </p>
+      <SignedRoom bodyId={bodyId} />
+    </>
+  );
 }

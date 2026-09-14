@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useI18n } from "@/lib/i18n";
 import type { BodyShow, Card } from "@/lib/types";
 
 export type DriveRequest =
@@ -98,6 +99,7 @@ export default function DrivePad({
   body: BodyShow;
   send: (cmd: DriveRequest) => Promise<string | null>;
 }) {
+  const { t } = useI18n();
   const [err, setErr] = useState("");
   const armed = Boolean(body.session_running && body.drive_listening);
   const episodic = (body.cards || []).filter((card) => card.mode === "episodic");
@@ -155,33 +157,31 @@ export default function DrivePad({
     };
   }, [armed]);
 
-  const hint = armed ? "" : "还不能开";
-
   return (
     <div className="drive-pad">
       <div className="stat">
-        <div className="label">开车</div>
+        <div className="label">{t("drive.label")}</div>
         <div className="drive-grid">
           <HoldButton
-            label="前进"
+            label={t("drive.forward")}
             disabled={!armed}
             onHold={() => dispatch({ twist: { x: WALK_X, y: 0, yaw: 0 } })}
             onRelease={() => dispatch({ halt: true })}
           />
           <HoldButton
-            label="后退"
+            label={t("drive.back")}
             disabled={!armed}
             onHold={() => dispatch({ twist: { x: -WALK_X, y: 0, yaw: 0 } })}
             onRelease={() => dispatch({ halt: true })}
           />
           <HoldButton
-            label="左转"
+            label={t("drive.left")}
             disabled={!armed}
             onHold={() => dispatch({ twist: { x: 0, y: 0, yaw: WALK_YAW } })}
             onRelease={() => dispatch({ halt: true })}
           />
           <HoldButton
-            label="右转"
+            label={t("drive.right")}
             disabled={!armed}
             onHold={() => dispatch({ twist: { x: 0, y: 0, yaw: -WALK_YAW } })}
             onRelease={() => dispatch({ halt: true })}
@@ -192,19 +192,15 @@ export default function DrivePad({
             disabled={!armed}
             onClick={() => dispatch({ halt: true })}
           >
-            停
+            {t("drive.halt")}
           </button>
         </div>
-        {hint ? (
-          <p className="sub">{hint}</p>
-        ) : (
-          <p className="sub">WASD 走转 · 空格停 · 拖画布转视角</p>
-        )}
+        <p className="sub">{armed ? t("drive.hint") : t("drive.cant")}</p>
         {err ? <p className="warn">{err}</p> : null}
       </div>
       {episodic.length ? (
         <div className="stat">
-          <div className="label">招式</div>
+          <div className="label">{t("drive.tricks")}</div>
           <div className="drive-tricks">
             {episodic.map((card: Card) => (
               <button

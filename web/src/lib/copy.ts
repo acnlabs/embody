@@ -1,14 +1,6 @@
-/** Owner-facing words. Agent / CLI language stays off this surface. */
+/** Owner-facing helpers. Words live in lib/i18n; this file stays usable on the server. */
 
-export function originLabel(origin: string): string {
-  if (origin === "robot") return "真机";
-  if (origin === "sim") return "仿真";
-  return origin;
-}
-
-export function sessionLabel(running?: boolean): string {
-  return running ? "开着" : "还没开";
-}
+import type { Translate } from "@/lib/i18n/types";
 
 export function agentLabel(body: { bound_agent_id: string; bound_agent_name?: string }): string {
   const name = (body.bound_agent_name || "").trim();
@@ -17,36 +9,55 @@ export function agentLabel(body: { bound_agent_id: string; bound_agent_name?: st
   return id.slice(0, 8);
 }
 
-export function cardModeLabel(mode?: string): string | null {
-  if (mode === "perpetual") return "步态";
-  if (mode === "episodic") return "招式";
+export function originLabel(origin: string, t: Translate): string {
+  if (origin === "robot") return t("origin.robot");
+  if (origin === "sim") return t("origin.sim");
+  return origin;
+}
+
+export function sessionLabel(running: boolean | undefined, t: Translate): string {
+  return running ? t("session.on") : t("session.off");
+}
+
+export function cardModeLabel(mode: string | undefined, t: Translate): string | null {
+  if (mode === "perpetual") return t("cards.gait");
+  if (mode === "episodic") return t("cards.trick");
   return mode || null;
 }
 
-export function buildKeyLabel(key: string): string {
-  const labels: Record<string, string> = {
-    bom: "型号",
-    serial: "编号",
-    modules: "模块",
-    calibration: "标定",
-  };
-  return labels[key] || key;
+export function buildKeyLabel(key: string, t: Translate): string {
+  const path = `build.${key}`;
+  const out = t(path);
+  return out === path ? key : out;
 }
 
 export const OWNER_ERR = {
-  login: "请先登录",
-  missing: "找不到这具身体",
-  forbidden: "这不是你的身体",
-  down: "暂时打不开",
+  login: "Please sign in",
+  missing: "This body was not found",
+  forbidden: "This is not your body",
+  down: "Can't open this right now",
 } as const;
 
-export function ownerError(raw: string): string {
-  if (/token required|Auth0 token|unauthorized/i.test(raw)) return "请先登录。";
-  if (/my-agents/i.test(raw)) return "暂时打不开。";
-  if (/not pushed|unknown body/i.test(raw)) return "找不到这具身体。";
-  if (/不属于|does not match/i.test(raw)) return "这不是你的身体。";
-  if (/load failed|Failed to fetch|NetworkError/i.test(raw)) return "加载失败。";
-  if (/drive failed/i.test(raw)) return "现在开不了。";
-  if (/need twist|do alias|JSON body/i.test(raw)) return "现在开不了。";
+export type OwnerErrorKind = "signIn" | "notFound" | "forbidden" | "down" | "load" | "drive";
+
+export function ownerErrorKind(raw: string): OwnerErrorKind | null {
+  if (/token required|Auth0 token|unauthorized|Please sign in|请先登录/i.test(raw)) return "signIn";
+  if (/my-agents|Can't open this right now|暂时打不开/i.test(raw)) return "down";
+  if (/not pushed|unknown body|was not found|找不到/i.test(raw)) return "notFound";
+  if (/不属于|does not match|not your body|这不是你的/i.test(raw)) return "forbidden";
+  if (/load failed|Failed to fetch|NetworkError|Couldn't load|加载失败/i.test(raw)) return "load";
+  if (/drive failed|need twist|do alias|JSON body|Can't drive|现在开不了/i.test(raw)) return "drive";
+  return null;
+}
+
+export function ownerError(raw: string, t?: Translate): string {
+  const kind = ownerErrorKind(raw);
+  if (kind && t) return t(`error.${kind}`);
+  if (kind === "signIn") return OWNER_ERR.login + ".";
+  if (kind === "notFound") return OWNER_ERR.missing + ".";
+  if (kind === "forbidden") return OWNER_ERR.forbidden + ".";
+  if (kind === "down") return OWNER_ERR.down + ".";
+  if (kind === "load") return "Couldn't load.";
+  if (kind === "drive") return "Can't drive right now.";
   return raw;
 }

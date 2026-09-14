@@ -5,10 +5,17 @@ import type { DuckPose } from "@/lib/duckPose";
 
 const PAPER = 0xf4f1ea;
 
-export default function DuckSnapshot({ pose }: { pose: DuckPose }) {
+export default function DuckSnapshot({ pose, ariaLabel }: { pose: DuckPose; ariaLabel: string }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const poseRef = useRef(pose);
+  const labelRef = useRef(ariaLabel);
   poseRef.current = pose;
+  labelRef.current = ariaLabel;
+
+  useEffect(() => {
+    const canvas = hostRef.current?.querySelector("canvas");
+    if (canvas) canvas.setAttribute("aria-label", ariaLabel);
+  }, [ariaLabel]);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -34,7 +41,7 @@ export default function DuckSnapshot({ pose }: { pose: DuckPose }) {
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       renderer.shadowMap.enabled = true;
       renderer.domElement.setAttribute("role", "img");
-      renderer.domElement.setAttribute("aria-label", "身体姿势，拖动转视角");
+      renderer.domElement.setAttribute("aria-label", labelRef.current);
       host.appendChild(renderer.domElement);
 
       scene.add(new THREE.HemisphereLight(0xfbf9f4, 0xb9c4cf, 1.1));
