@@ -22,6 +22,7 @@ export const zh: Messages = {
     tricks: "{n} 个招式",
     tilt: "倾斜 {n}°",
     moduleOff: "无",
+    figure: "这具身体的外形",
   },
   origin: {
     sim: "仿真",

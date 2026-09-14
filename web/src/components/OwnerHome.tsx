@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useAuth0 } from "@auth0/auth0-react";
 import { useEffect, useState } from "react";
 import { AUTH0_AUDIENCE, AUTH0_CLIENT_ID } from "@/lib/auth0";
+import DuckSnapshot from "@/components/DuckSnapshot";
 import { originLabel, ownerError, sessionLabel, agentLabel } from "@/lib/copy";
+import { poseFromNumbers } from "@/lib/duckPose";
 import { useI18n } from "@/lib/i18n";
 import type { BodyShow } from "@/lib/types";
 
@@ -42,15 +44,18 @@ export function BodyCard({ body }: { body: BodyShow }) {
   const { t } = useI18n();
   const key = keyNumber(body, t);
   const tricks = body.cards?.length || 0;
+  const pose = poseFromNumbers(body.numbers ?? null);
   return (
     <article className="body-card">
       <Link href={`/b/${body.id}`}>
         <div className="body-cover">
+          {body.kind === "microduck" ? (
+            <DuckSnapshot pose={pose} ariaLabel={t("home.figure")} still />
+          ) : null}
           <span className="badge">{body.kind}</span>
           <span className={`status${body.session_running ? " on" : ""}`}>
             {sessionLabel(body.session_running, t)}
           </span>
-          <span className="title">{body.name || body.id}</span>
           {key ? <span className="keynum">{key}</span> : null}
         </div>
       </Link>

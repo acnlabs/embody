@@ -20,6 +20,7 @@ export const en = {
     tricks: "{n} tricks",
     tilt: "Tilt {n}°",
     moduleOff: "no",
+    figure: "This body's figure",
   },
   origin: {
     sim: "Sim",

@@ -5,10 +5,19 @@ import type { DuckPose } from "@/lib/duckPose";
 
 const PAPER = 0xf4f1ea;
 
-export default function DuckSnapshot({ pose, ariaLabel }: { pose: DuckPose; ariaLabel: string }) {
+export default function DuckSnapshot({
+  pose,
+  ariaLabel,
+  still = false,
+}: {
+  pose: DuckPose;
+  ariaLabel: string;
+  still?: boolean;
+}) {
   const hostRef = useRef<HTMLDivElement>(null);
   const poseRef = useRef(pose);
   const labelRef = useRef(ariaLabel);
+  const drawRef = useRef<(() => void) | null>(null);
   poseRef.current = pose;
   labelRef.current = ariaLabel;
 
@@ -16,6 +25,10 @@ export default function DuckSnapshot({ pose, ariaLabel }: { pose: DuckPose; aria
     const canvas = hostRef.current?.querySelector("canvas");
     if (canvas) canvas.setAttribute("aria-label", ariaLabel);
   }, [ariaLabel]);
+
+  useEffect(() => {
+    drawRef.current?.();
+  }, [pose]);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -28,7 +41,6 @@ export default function DuckSnapshot({ pose, ariaLabel }: { pose: DuckPose; aria
 
     void (async () => {
       const THREE = await import("three");
-      const { OrbitControls } = await import("three/addons/controls/OrbitControls.js");
       const { applyDuckPose, loadDuckRig } = await import("@/lib/duckRig");
       if (dead || !hostRef.current) return;
 
@@ -38,10 +50,11 @@ export default function DuckSnapshot({ pose, ariaLabel }: { pose: DuckPose; aria
       camera.position.set(0.28, 0.16, 0.3);
 
       renderer = new THREE.WebGLRenderer({ antialias: true });
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, still ? 1.5 : 2));
       renderer.shadowMap.enabled = true;
       renderer.domElement.setAttribute("role", "img");
       renderer.domElement.setAttribute("aria-label", labelRef.current);
+      if (still) renderer.domElement.style.pointerEvents = "none";
       host.appendChild(renderer.domElement);
 
       scene.add(new THREE.HemisphereLight(0xfbf9f4, 0xb9c4cf, 1.1));
@@ -74,18 +87,25 @@ export default function DuckSnapshot({ pose, ariaLabel }: { pose: DuckPose; aria
       }
       const center = box.getCenter(new THREE.Vector3());
       const size = Math.max(box.getSize(new THREE.Vector3()).length(), 0.12);
-      camera.position.set(center.x + size * 1.15, center.y + size * 0.55, center.z + size * 1.3);
-      const orbit = new OrbitControls(camera, renderer.domElement);
-      orbit.enablePan = false;
-      orbit.enableDamping = true;
-      orbit.dampingFactor = 0.08;
-      orbit.minDistance = Math.max(0.08, size * 0.35);
-      orbit.maxDistance = Math.max(0.9, size * 4);
-      orbit.target.copy(center);
-      const keyed = orbit as { enableKeys?: boolean };
-      if ("enableKeys" in keyed) keyed.enableKeys = false;
-      orbit.update();
-      controls = orbit;
+      const near = still ? 0.95 : 1.15;
+      camera.position.set(center.x + size * near, center.y + size * 0.5, center.z + size * (still ? 1.15 : 1.3));
+      camera.lookAt(center);
+
+      if (!still) {
+        const { OrbitControls } = await import("three/addons/controls/OrbitControls.js");
+        if (dead || !renderer) return;
+        const orbit = new OrbitControls(camera, renderer.domElement);
+        orbit.enablePan = false;
+        orbit.enableDamping = true;
+        orbit.dampingFactor = 0.08;
+        orbit.minDistance = Math.max(0.08, size * 0.35);
+        orbit.maxDistance = Math.max(0.9, size * 4);
+        orbit.target.copy(center);
+        const keyed = orbit as { enableKeys?: boolean };
+        if ("enableKeys" in keyed) keyed.enableKeys = false;
+        orbit.update();
+        controls = orbit;
+      }
 
       const fit = () => {
         if (!renderer) return;
@@ -94,16 +114,28 @@ export default function DuckSnapshot({ pose, ariaLabel }: { pose: DuckPose; aria
         renderer.setSize(w, h, false);
         camera.aspect = w / Math.max(h, 1);
         camera.updateProjectionMatrix();
+        if (still) renderer.render(scene, camera);
       };
       fit();
       resize = new ResizeObserver(fit);
       resize.observe(host);
 
-      const tick = () => {
+      const draw = () => {
         if (dead || !renderer) return;
         applyDuckPose(rig, poseRef.current);
-        orbit.update();
+        controls?.update();
         renderer.render(scene, camera);
+      };
+      drawRef.current = draw;
+
+      if (still) {
+        draw();
+        return;
+      }
+
+      const tick = () => {
+        if (dead || !renderer) return;
+        draw();
         raf = requestAnimationFrame(tick);
       };
       tick();
@@ -111,6 +143,7 @@ export default function DuckSnapshot({ pose, ariaLabel }: { pose: DuckPose; aria
 
     return () => {
       dead = true;
+      drawRef.current = null;
       cancelAnimationFrame(raf);
       resize?.disconnect();
       controls?.dispose();
@@ -119,7 +152,7 @@ export default function DuckSnapshot({ pose, ariaLabel }: { pose: DuckPose; aria
         renderer.domElement.remove();
       }
     };
-  }, []);
+  }, [still]);
 
-  return <div className="duck-stage" ref={hostRef} />;
+  return <div className={`duck-stage${still ? " still" : ""}`} ref={hostRef} />;
 }
