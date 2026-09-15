@@ -1,14 +1,9 @@
 import type { BodyShow } from "@/lib/types";
-
-function chatApiOrigin(): string {
-  return (
-    process.env.AGENTPLANET_API_URL?.trim() ||
-    process.env.NEXT_PUBLIC_AGENTPLANET_API_URL?.trim() ||
-    "https://api.agentplanet.org"
-  ).replace(/\/+$/, "");
-}
+import { bareAgentId, chatApiOrigin } from "@/lib/chatGateway";
 
 export type MyAgent = { id: string; name: string };
+
+export { bareAgentId };
 
 const myAgentsCache = new Map<string, { agents: MyAgent[]; exp: number }>();
 
@@ -38,7 +33,7 @@ export async function fetchMyAgents(bearer: string): Promise<MyAgent[] | null> {
     const agents = rows
       .map((raw) => {
         const row = raw as { agent_id?: unknown; id?: unknown; name?: unknown };
-        const id = String(row.agent_id ?? row.id ?? "").replace(/^acn:/, "");
+        const id = bareAgentId(String(row.agent_id ?? row.id ?? ""));
         if (!id) return null;
         return { id, name: String(row.name ?? "").trim() || id };
       })

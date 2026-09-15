@@ -51,6 +51,7 @@ export const zh: Messages = {
     canvas: "身体姿势，拖动转视角",
     happened: "刚发生的",
     happenedEmpty: "还没有。",
+    chat: "对话",
   },
   drive: {
     label: "开车",
@@ -128,5 +129,20 @@ export const zh: Messages = {
     label: "语言",
     en: "EN",
     zh: "中文",
+  },
+  interfaze: {
+    title: "对话",
+    chatWith: "和 {name} 聊",
+    close: "关闭对话",
+    needLogin: "登录后才能聊。",
+    loading: "正在打开对话…",
+    retry: "重试",
+    originForbidden: "这间房还不能嵌入对话。",
+    chatForbidden: "这个 agent 现在不开放对话。",
+    tokenInvalid: "对话已过期，请再试一次。",
+    noCredits: "对话要用 AgentPlanet Credits，余额不够。",
+    topUp: "去充值",
+    upstreamError: "暂时连不上对话。",
+    error: "对话出错了，请稍后再试。",
   },
 };

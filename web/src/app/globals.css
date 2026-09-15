@@ -12,6 +12,8 @@
   --warn: #c2255c;
   --grid-line: rgba(28, 61, 90, 0.055);
   --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  --topbar-height: 3.25rem;
+  --interfaze-dock-width: 24rem;
 }
 
 * { box-sizing: border-box; }
@@ -47,7 +49,7 @@ a:hover { color: var(--accent); text-decoration: none; }
   display: flex;
   align-items: center;
   gap: 1.5rem;
-  height: 3.25rem;
+  height: var(--topbar-height);
   padding: 0 1rem;
   max-width: 76rem;
   margin: 0 auto;
@@ -175,6 +177,14 @@ button.lang-btn.on:hover { color: var(--paper-2); }
 /* ---------- Page ---------- */
 main { max-width: 76rem; margin: 0 auto; padding: 2rem 1rem 4rem; }
 @media (min-width: 640px) { main { padding: 2rem 1.5rem 4rem; } }
+
+html.interfaze-dock-open main {
+  padding-right: calc(var(--interfaze-dock-width) + 1.5rem);
+}
+
+@media (max-width: 760px) {
+  html.interfaze-dock-open main { padding-right: 1rem; }
+}
 
 footer {
   max-width: 76rem;
@@ -703,6 +713,108 @@ pre code { background: none; border: none; padding: 0; }
   .control-what { grid-column: 1 / 2; }
   .control-when { grid-column: 2 / 3; grid-row: 1 / 3; }
   .control-hint { grid-column: 1 / 2; }
+}
+
+.room-head .chat-open {
+  padding: 0.15rem 0.65rem;
+  font-size: 0.78rem;
+}
+
+.interfaze-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  border: 0;
+  border-radius: 0;
+  background: rgba(28, 61, 90, 0.35);
+}
+
+@media (min-width: 761px) {
+  .interfaze-scrim { display: none; }
+}
+
+.interfaze-dock {
+  display: none;
+  position: fixed;
+  z-index: 40;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--paper-2);
+  border-left: 1px solid var(--line-strong);
+}
+
+.interfaze-dock.open { display: flex; }
+
+@media (max-width: 760px) {
+  .interfaze-dock.open {
+    inset: auto 0 0;
+    height: 80dvh;
+    border-left: 0;
+    border-top: 1px solid var(--line-strong);
+    border-radius: 12px 12px 0 0;
+  }
+}
+
+@media (min-width: 761px) {
+  .interfaze-dock.open {
+    top: var(--topbar-height);
+    right: 0;
+    bottom: 0;
+    width: var(--interfaze-dock-width);
+  }
+}
+
+.interfaze-dock-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  height: 2.75rem;
+  padding: 0 0.75rem;
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.interfaze-dock-head h2 {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.interfaze-dock-body {
+  position: relative;
+  z-index: 0;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.interfaze-fill { position: relative; min-height: 0; height: 100%; }
+
+.interfaze-frame {
+  width: 100%;
+  border: 0;
+  background: var(--paper-2);
+}
+
+.interfaze-frame.fill {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+}
+
+.interfaze-error {
+  padding: 1rem 1.1rem;
+  font-size: 0.88rem;
+  color: var(--ink-soft);
+}
+
+.interfaze-error a,
+.interfaze-error button {
+  margin-top: 0.7rem;
 }
 
 /* ---------- Misc ---------- */

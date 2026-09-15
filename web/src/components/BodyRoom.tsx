@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { AUTH0_AUDIENCE, AUTH0_CLIENT_ID } from "@/lib/auth0";
 import DuckSnapshot from "@/components/DuckSnapshot";
 import DrivePad, { type DriveRequest } from "@/components/DrivePad";
+import InterfazeChatDock from "@/components/interfaze/InterfazeChatDock";
 import { poseFromNumbers } from "@/lib/duckPose";
 import {
   buildKeyLabel,
@@ -292,9 +293,11 @@ function ControlLog({ events }: { events: ControlEvent[] }) {
 export function RoomView({
   body,
   send,
+  onChat,
 }: {
   body: BodyShow;
   send?: (cmd: DriveRequest) => Promise<string | null>;
+  onChat?: () => void;
 }) {
   const { t } = useI18n();
   const cards = body.cards || [];
@@ -312,6 +315,11 @@ export function RoomView({
         <div className="sub">
           <span title={body.bound_agent_id}>{t("room.bound", { agent: agentLabel(body) })}</span>
           <span>{t("room.updated", { ago: formatAgo(body.pushed_at, t) })}</span>
+          {onChat && body.bound_agent_id ? (
+            <button type="button" className="chat-open" onClick={onChat}>
+              {t("room.chat")}
+            </button>
+          ) : null}
         </div>
       </header>
 
@@ -350,6 +358,7 @@ function SignedRoom({ bodyId }: { bodyId: string }) {
     numbers_error?: string;
   } | null>(null);
   const [err, setErr] = useState("");
+  const [chatOpen, setChatOpen] = useState(false);
 
   useEffect(() => {
     if (!auth.isAuthenticated) return;
@@ -469,7 +478,18 @@ function SignedRoom({ bodyId }: { bodyId: string }) {
       return exc instanceof Error ? ownerError(exc.message, t) : t("error.drive");
     }
   };
-  return <RoomView body={view} send={send} />;
+  return (
+    <>
+      <RoomView body={view} send={send} onChat={() => setChatOpen(true)} />
+      <InterfazeChatDock
+        agentId={body.bound_agent_id}
+        agentName={agentLabel(body)}
+        bodyId={body.id}
+        open={chatOpen}
+        onClose={() => setChatOpen(false)}
+      />
+    </>
+  );
 }
 
 export default function BodyRoom({ bodyId }: { bodyId: string }) {

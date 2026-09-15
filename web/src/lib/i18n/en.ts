@@ -49,6 +49,7 @@ export const en = {
     canvas: "Body pose. Drag to look around.",
     happened: "What happened",
     happenedEmpty: "Nothing yet.",
+    chat: "Chat",
   },
   drive: {
     label: "Drive",
@@ -126,6 +127,21 @@ export const en = {
     label: "Language",
     en: "EN",
     zh: "中文",
+  },
+  interfaze: {
+    title: "Chat",
+    chatWith: "Chat with {name}",
+    close: "Close chat",
+    needLogin: "Sign in to chat.",
+    loading: "Opening chat…",
+    retry: "Try again",
+    originForbidden: "This studio isn't allowed to embed chat yet.",
+    chatForbidden: "This agent isn't open for chat.",
+    tokenInvalid: "The chat session expired. Try again.",
+    noCredits: "Chat uses AgentPlanet Credits — your balance is too low.",
+    topUp: "Top up",
+    upstreamError: "Chat is unreachable right now.",
+    error: "Chat failed. Try again later.",
   },
 } as const;
 

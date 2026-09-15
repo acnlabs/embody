@@ -137,7 +137,7 @@ Out of this probe: Jobs training CLI, real-robot **session**, Credits, a second 
 | ACN | Identity, tasks, collaboration with the **agent**. Optional later: a public nameplate. | Session verbs. Joint commands. Own the workplace ledger. Talk to the body. |
 | AgentPlanet | Launch / Credits / embed / Store. Owner identity: `my-agents`. | Body title. Body remote. Charge `source=embody`. Receive body POSTs. |
 | embody CLI | Create / bind / drive on this machine. `push` a Show snapshot to Embody web. | Call ACN about tasks. Store task ids. Search Hub. Bind the laptop instead of the body. POST the AgentPlanet registry. |
-| embody web | Hosted owner rooms. Mint body ids (`join`). Auth0 (same tenant as ComicLaw). Accept agent `push`. Enqueue `twist` / `do` / `halt` for the session watch to run. | Talk to localhost sim. Hub search. Credits. Interfaze (until embed_hosts). Localhost-as-product. |
+| embody web | Hosted owner rooms. Mint body ids (`join`). Auth0 (same tenant as ComicLaw). Accept agent `push`. Enqueue `twist` / `do` / `halt` for the session watch to run. Owner may embed Interfaze chat with the bound agent (`context: body:{id}`) after the origin is in Gateway `embed_hosts`. Credits stay on AgentPlanet chat. | Talk to localhost sim. Hub search. Charge `source=embody`. Localhost-as-product. Interfaze **host** page (iframe from interfaze.io) is a later cut. |
 | kind runtime | Train and move this machine type. | Become the platform. Rank Hub cards for the workplace. |
 
 `registry print` dumps the **local** ledger. It does not POST. `push` writes to **Embody web**, not AgentPlanet.
