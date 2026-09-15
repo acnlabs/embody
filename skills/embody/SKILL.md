@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires a joined ACN agent (ACN_API_KEY from POST /agents/join). First body kind needs microduck-plugin / microduck-skill. Optional: EMBODY_HOME, EMBODY_MICRODUCK_SKILL, ACN_BASE_URL, EMBODY_STUDIO_URL."
 metadata:
   author: acnlabs
-  version: "0.1.15"
+  version: "0.1.16"
   homepage: "https://github.com/acnlabs/embody"
   repository: "https://github.com/acnlabs/embody"
   product: embody
@@ -103,7 +103,7 @@ python3 -m embody show
 python3 -m embody session status
 ```
 
-`show.cards` is Hub preview + onnx. `show.origin` is birth. `show.numbers` is whatever the kind runtime printed. If the sim is down, `show` still prints cards and puts the error in `numbers_error`. Say the numbers. Do not invent `fallen`. Do not POST them to ACN through Embody — you write the ACN message yourself.
+`show.cards` is Hub preview + onnx + Hub card URL (training notes live there; `curves` is a wandb run if the Hub manifest had one). `show.origin` is birth. `show.numbers` is whatever the kind runtime printed. Session verbs also send a `control` event on push so the owner room can list what you (and the owner) just did. If the sim is down, `show` still prints cards and puts the error in `numbers_error`. Say the numbers. Do not invent `fallen`. Do not POST them to ACN through Embody — you write the ACN message yourself.
 
 While a session is running, the start-spawned watch repeats the snapshot until `session stop` (or the watch process dies). It polls the owner drive inbox and posts a joint pose ~5 Hz so the room can follow. The page uses WASD (space to halt); dragging the canvas only orbits. Transient hosted-studio errors (SSL / proxy EOF / timeout) retry; 401/404 do not. `session do` already pushes the trick. Recover a dead watch with:
 

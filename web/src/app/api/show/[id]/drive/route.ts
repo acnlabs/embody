@@ -1,7 +1,8 @@
 import { randomBytes } from "crypto";
+import { parseControlEvent, type ControlEvent } from "@/lib/control";
 import { OWNER_ERR } from "@/lib/copy";
 import { parseDrive } from "@/lib/drive";
-import { getBody, putDrive } from "@/lib/ledger";
+import { appendBodyControl, getBody, putDrive } from "@/lib/ledger";
 import { fetchMyAgents } from "@/lib/myAgents";
 import { extractBearerToken, verifyUserToken } from "@/lib/userAuth";
 
@@ -39,10 +40,19 @@ export async function POST(
     return Response.json({ ok: false, error: parsed.error }, { status: 400 });
   }
   await putDrive(id, parsed);
+  const event: ControlEvent | null = parseControlEvent({
+    at: parsed.at,
+    source: "owner",
+    op: parsed.op,
+    ...(parsed.op === "do" ? { alias: parsed.alias } : {}),
+    ...(parsed.op === "twist" ? { x: parsed.x, y: parsed.y, yaw: parsed.yaw } : {}),
+  });
+  const control = event ? await appendBodyControl(id, event) : (body.control || []);
   return Response.json({
     ok: true,
     queued: true,
     command: parsed,
+    control,
     note: "Last write wins.",
   });
 }

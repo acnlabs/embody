@@ -94,7 +94,7 @@ export function BodyCard({ body }: { body: BodyShow }) {
           <span className={`status${liveNow ? " on" : ""}`}>
             {sessionLabel(liveNow, t)}
           </span>
-          {key ? <span className="keynum">{key}</span> : null}
+          {liveNow && key ? <span className="keynum">{key}</span> : null}
         </div>
       </Link>
       <div className="body-meta">

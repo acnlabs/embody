@@ -1,5 +1,6 @@
 import { mkdirSync, readFileSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
+import { appendControl, type ControlEvent } from "@/lib/control";
 import type { DriveCmd } from "@/lib/drive";
 import { isDriveFresh } from "@/lib/drive";
 import type { BodyPose, BodyShow } from "@/lib/types";
@@ -87,7 +88,7 @@ export async function registerBody(row: BodyShow): Promise<BodyShow | null> {
 
 export async function upsertBody(
   show: BodyShow,
-  opts?: { listen?: boolean },
+  opts?: { listen?: boolean; control?: ControlEvent | null },
 ): Promise<BodyShow> {
   const existing = (await readLedger()).bodies[show.id];
   const now = new Date().toISOString();
@@ -97,6 +98,7 @@ export async function upsertBody(
     pushed_at: now,
     build: show.build ?? existing?.build,
     drive_listen_at: opts?.listen ? now : existing?.drive_listen_at,
+    control: appendControl(existing?.control, opts?.control),
   });
   if (useKv()) {
     const client = await kv();
@@ -124,6 +126,22 @@ export async function touchDriveListen(id: string): Promise<void> {
   const ledger = readFile();
   ledger.bodies[stored.id] = stored;
   writeFile(ledger);
+}
+
+export async function appendBodyControl(id: string, event: ControlEvent): Promise<ControlEvent[]> {
+  const existing = await getBody(id);
+  if (!existing) return [];
+  const control = appendControl(existing.control, event);
+  const stored: BodyShow = persistShow({ ...existing, control });
+  if (useKv()) {
+    const client = await kv();
+    await client.hset(KV_KEY, { [stored.id]: stored });
+    return control;
+  }
+  const ledger = readFile();
+  ledger.bodies[stored.id] = stored;
+  writeFile(ledger);
+  return control;
 }
 
 export async function putDrive(id: string, cmd: DriveCmd): Promise<void> {

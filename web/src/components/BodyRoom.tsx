@@ -15,8 +15,11 @@ import {
   sessionLabel,
   agentLabel,
   bodyIsLive,
+  controlWhat,
+  twistHint,
 } from "@/lib/copy";
 import { formatAgo, useI18n, type Translate } from "@/lib/i18n";
+import type { ControlEvent } from "@/lib/control";
 import type { BodyShow, Card } from "@/lib/types";
 
 function num(v: unknown, digits: number): string {
@@ -48,6 +51,18 @@ function Telemetry({ body }: { body: BodyShow }) {
     feet?: Record<string, { contact?: boolean }>;
   };
   const feet = state.feet || {};
+  if (!bodyIsLive(body)) {
+    return (
+      <div className="telemetry">
+        <div className="stat">
+          <div className="label">{t("status.label")}</div>
+          <p className="sub" style={{ marginTop: "0.4rem" }}>
+            {t("status.noNumbers")}
+          </p>
+        </div>
+      </div>
+    );
+  }
   if (body.numbers_error) {
     return (
       <div className="telemetry">
@@ -210,6 +225,7 @@ function MainStage({ body }: { body: BodyShow }) {
 function SkillCard({ card }: { card: Card }) {
   const { t } = useI18n();
   const mode = cardModeLabel(card.mode, t);
+  const hubPage = card.card || (card.hub ? `https://huggingface.co/${card.hub}` : "");
   return (
     <article className="skill-card">
       <div className="skill-preview">
@@ -224,8 +240,52 @@ function SkillCard({ card }: { card: Card }) {
           <span className="alias">{card.alias}</span>
           {mode ? <span className="badge">{mode}</span> : null}
         </div>
+        {hubPage ? (
+          <div className="hub">
+            <a href={hubPage} target="_blank" rel="noreferrer">
+              {card.hub}
+            </a>
+            {card.curves ? (
+              <>
+                {" · "}
+                <a href={card.curves} target="_blank" rel="noreferrer">
+                  {t("cards.curves")}
+                </a>
+              </>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </article>
+  );
+}
+
+function ControlLog({ events }: { events: ControlEvent[] }) {
+  const { t } = useI18n();
+  const rows = events.slice().reverse();
+  return (
+    <>
+      <h3 className="cards-head">{t("room.happened")}</h3>
+      {rows.length ? (
+        <div className="control-log">
+          {rows.map((event, i) => (
+            <div className="control-row" key={`${event.at}-${i}`}>
+              <span className="control-who">
+                {event.source === "owner" ? t("control.you") : t("control.agent")}
+              </span>
+              <span className="control-what">
+                {controlWhat(event, t)}
+                {event.executed === false ? ` · ${t("control.missed")}` : ""}
+              </span>
+              <span className="control-when">{formatAgo(event.at, t)}</span>
+              {twistHint(event) ? <span className="control-hint">{twistHint(event)}</span> : null}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="meta">{t("room.happenedEmpty")}</p>
+      )}
+    </>
   );
 }
 
@@ -264,6 +324,8 @@ export function RoomView({
       </div>
 
       {body.build && Object.keys(body.build).length ? <BuildSection build={body.build} /> : null}
+
+      <ControlLog events={body.control || []} />
 
       <h3 className="cards-head">{t("cards.heading", { n: cards.length })}</h3>
       {cards.length ? (
@@ -397,8 +459,11 @@ function SignedRoom({ bodyId }: { bodyId: string }) {
         },
         body: JSON.stringify(cmd),
       });
-      const json = (await res.json()) as { error?: string };
+      const json = (await res.json()) as { error?: string; control?: ControlEvent[] };
       if (!res.ok) return ownerError(json.error || res.statusText, t);
+      if (Array.isArray(json.control)) {
+        setBody((prev) => (prev ? { ...prev, control: json.control } : prev));
+      }
       return null;
     } catch (exc) {
       return exc instanceof Error ? ownerError(exc.message, t) : t("error.drive");

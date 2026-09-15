@@ -29,6 +29,7 @@ from embody.models import (
     Session,
     State,
     asset_ref,
+    hub_card_url,
     hub_resolve,
     new_id,
     utc_now,
@@ -36,7 +37,15 @@ from embody.models import (
 )
 from embody.join import JoinError, join_body, leave_body, studio_configured
 from embody.push import PushError, post_pose, post_show, push_document, take_inbox, transient_push_error
-from embody.show import body_card, live_show, public_runtime_error, show_for
+from embody.hub import lift_curves_url
+from embody.show import (
+    agent_control,
+    body_card,
+    live_show,
+    public_runtime_error,
+    show_for,
+    with_control,
+)
 from embody.studio import DEFAULT_BIND, DEFAULT_PORT, serve as serve_studio
 from embody.store import load, save
 from embody.watch import spawn_watch, stop_watch, watch_alive
@@ -433,6 +442,7 @@ def cmd_policy_attach(args: argparse.Namespace) -> int:
         startable=startable,
         preview_url=hub_resolve(hub, "preview.mp4"),
         attached_at=utc_now(),
+        curves_url=lift_curves_url(hub),
     )
     body.policies = [p for p in body.policies if p.alias != alias]
     body.policies.append(policy)
@@ -445,6 +455,8 @@ def cmd_policy_attach(args: argparse.Namespace) -> int:
             "card": {
                 "preview": policy.preview_url,
                 "onnx": hub_resolve(hub, "policy.onnx"),
+                "card": hub_card_url(hub),
+                "curves": policy.curves_url,
                 "note": "resolve/main on a card plays; a raw click downloads",
             },
             "state": str(path),
@@ -519,7 +531,7 @@ def cmd_session_start(args: argparse.Namespace) -> int:
         start_hub=policy.hub,
     )
     path = save(state)
-    show = show_for(body, adapter=adapter)
+    show = with_control(show_for(body, adapter=adapter), agent_control("start", alias=policy.alias))
     payload: dict[str, Any] = {
         "ok": True,
         "body": body.name or body.id,
@@ -558,15 +570,19 @@ def cmd_session_pull(args: argparse.Namespace) -> int:
     if policy is None:
         raise CliError(f"unknown policy alias {args.as_name!r} — attach first")
     adapter = run_adapter(body, "pull", policy=policy, dry_run=bool(args.dry_run))
-    return _dump(
-        {
-            "ok": True,
-            "body": body.name or body.id,
-            "policy": policy.to_dict(),
-            "show": show_for(body, adapter=adapter),
-            "adapter": adapter,
-        }
-    )
+    show = with_control(show_for(body, adapter=adapter), agent_control("pull", alias=policy.alias))
+    payload: dict[str, Any] = {
+        "ok": True,
+        "body": body.name or body.id,
+        "policy": policy.to_dict(),
+        "show": show,
+        "adapter": adapter,
+    }
+    if not args.dry_run:
+        pushed = _owner_push(body, show=show)
+        if pushed is not None:
+            payload["pushed"] = pushed
+    return _dump(payload)
 
 
 def cmd_session_do(args: argparse.Namespace) -> int:
@@ -582,6 +598,11 @@ def cmd_session_do(args: argparse.Namespace) -> int:
         raise CliError(f"unknown policy alias {args.alias!r}")
     adapter = run_adapter(body, "do", alias=policy.alias, dry_run=bool(args.dry_run))
     show = show_for(body, adapter=adapter)
+    numbers = show.get("numbers") if isinstance(show.get("numbers"), dict) else None
+    show = with_control(
+        show,
+        agent_control("do", alias=policy.alias, numbers=numbers if isinstance(numbers, dict) else None),
+    )
     payload: dict[str, Any] = {
         "ok": True,
         "body": body.name or body.id,
@@ -613,7 +634,10 @@ def cmd_session_twist(args: argparse.Namespace) -> int:
         yaw=float(args.yaw),
         dry_run=bool(args.dry_run),
     )
-    show = show_for(body, adapter=adapter)
+    show = with_control(
+        show_for(body, adapter=adapter),
+        agent_control("twist", x=float(args.x), y=float(args.y), yaw=float(args.yaw)),
+    )
     payload: dict[str, Any] = {
         "ok": True,
         "body": body.name or body.id,
@@ -637,7 +661,7 @@ def cmd_session_halt(args: argparse.Namespace) -> int:
             f"run: python3 -m embody session start --body {body.name or body.id}"
         )
     adapter = run_adapter(body, "halt", dry_run=bool(args.dry_run))
-    show = show_for(body, adapter=adapter)
+    show = with_control(show_for(body, adapter=adapter), agent_control("halt"))
     payload: dict[str, Any] = {
         "ok": True,
         "body": body.name or body.id,
@@ -674,15 +698,17 @@ def cmd_session_stop(args: argparse.Namespace) -> int:
         adapter = {"ok": False, "error": public_runtime_error(exc)}
     body.session = None
     path = save(state)
+    show = with_control(show_for(body, adapter=adapter if isinstance(adapter, dict) else None), agent_control("stop"))
     payload: dict[str, Any] = {
         "ok": True,
         "body": body.name or body.id,
         "adapter": adapter,
+        "show": show,
         "state": str(path),
         "note": "session cleared even if the sim was already gone",
     }
     if not args.dry_run:
-        pushed = _owner_push(body)
+        pushed = _owner_push(body, show=show)
         if pushed is not None:
             payload["pushed"] = pushed
     return _dump(payload)

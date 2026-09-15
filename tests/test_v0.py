@@ -48,6 +48,21 @@ def bind_offline(agent_id: str = "agent-1", body: str | None = None) -> None:
 def test_lift_runtime_numbers() -> None:
     raw = {"tilt_deg": 4.2, "ok": True, "feet": {"left": {"contact": True}}}
     assert lift_runtime_numbers({"stdout": json.dumps(raw)}) == raw
+
+
+def test_hub_curves_url_from_training() -> None:
+    from embody.hub import curves_url_from_training, lift_curves_url
+
+    assert (
+        curves_url_from_training({"wandb": "https://wandb.ai/acn/mjlab_microduck/runs/abc"})
+        == "https://wandb.ai/acn/mjlab_microduck/runs/abc"
+    )
+    assert (
+        curves_url_from_training({"wandb_run_path": "acn/mjlab_microduck/xyz"})
+        == "https://wandb.ai/acn/mjlab_microduck/runs/xyz"
+    )
+    assert curves_url_from_training({"repo": "pollen-robotics/microduck_rl"}) is None
+    assert lift_curves_url("neil-jo/microduck-walk") is None
     assert lift_runtime_numbers({"stdout": "not-json\n"}) is None
     assert lift_runtime_numbers({"stdout": ""}) is None
     assert lift_runtime_numbers({}) is None
@@ -124,6 +139,8 @@ def test_whoami_body_policy_registry(home: Path, capsys: pytest.CaptureFixture[s
     assert walk_card["mode"] == "perpetual"
     assert walk_card["onnx"].endswith("/policy.onnx")
     assert walk_card["preview"].endswith("/preview.mp4")
+    assert walk_card["card"] == "https://huggingface.co/neil-jo/microduck-walk"
+    assert "curves" not in walk_card
     assert card["next"] == "session start"
 
     capsys.readouterr()
@@ -342,7 +359,11 @@ def test_session_per_body_and_adapter_one_sim(
 
     assert main(["session", "start", "--body", "duck-1", "--as", "polite_bow", "--dry-run"]) == 1
     assert main(["session", "prepare", "--body", "duck-1", "--dry-run"]) == 0
+    capsys.readouterr()
     assert main(["session", "start", "--body", "duck-1", "--dry-run"]) == 0
+    started = json.loads(capsys.readouterr().out)
+    assert started["show"]["control"]["op"] == "start"
+    assert started["show"]["control"]["alias"] == "walk"
     assert load().body_by_token("duck-1") is not None
     assert load().body_by_token("duck-1").session is not None
     assert load().body_by_token("duck-1").session.start_hub == "neil-jo/microduck-walk"
@@ -361,6 +382,7 @@ def test_session_per_body_and_adapter_one_sim(
     assert main(["session", "do", "--body", "duck-1", "polite_bow"]) == 0
     did = json.loads(capsys.readouterr().out)
     assert did["show"]["numbers"] == {"tilt_deg": 2.0, "ok": True, "executed": True}
+    assert did["show"]["control"]["op"] == "do"
     assert did["show"]["cards"]
     assert "pushed" not in did
     assert main(["session", "stop", "--body", "duck-1", "--dry-run"]) == 0
@@ -415,6 +437,9 @@ def test_session_do_pushes_owner_show(
         assert out["show"]["numbers"]["executed"] is True
         shows = [row for row in stub.requests if row["path"] == "/api/agent/show"]
         assert shows[-1]["body"]["show"]["numbers"]["executed"] is True
+        assert shows[-1]["body"]["show"]["control"]["op"] == "do"
+        assert shows[-1]["body"]["show"]["control"]["source"] == "agent"
+        assert shows[-1]["body"]["show"]["control"]["alias"] == "polite_bow"
     finally:
         stub.close()
 

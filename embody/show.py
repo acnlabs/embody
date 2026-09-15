@@ -4,7 +4,7 @@ import json
 from typing import Any
 
 from embody.adapters import AdapterError, run as run_adapter
-from embody.models import Body, hub_resolve
+from embody.models import Body, Policy, hub_card_url, hub_resolve, utc_now
 from embody.store import load
 
 
@@ -32,6 +32,32 @@ def lift_runtime_numbers(adapter: dict[str, Any]) -> dict[str, Any] | None:
     except json.JSONDecodeError:
         return None
     return parsed if isinstance(parsed, dict) else None
+
+
+def agent_control(
+    op: str,
+    *,
+    alias: str | None = None,
+    x: float | None = None,
+    y: float | None = None,
+    yaw: float | None = None,
+    numbers: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """One verb the owner room appends. Not a joint table."""
+    event: dict[str, Any] = {"source": "agent", "op": op, "at": utc_now()}
+    if alias:
+        event["alias"] = alias
+    if op == "twist":
+        event["x"] = 0.0 if x is None else float(x)
+        event["y"] = 0.0 if y is None else float(y)
+        event["yaw"] = 0.0 if yaw is None else float(yaw)
+    if isinstance(numbers, dict) and isinstance(numbers.get("executed"), bool):
+        event["executed"] = numbers["executed"]
+    return event
+
+
+def with_control(show: dict[str, Any], event: dict[str, Any]) -> dict[str, Any]:
+    return {**show, "control": event}
 
 
 def next_hint(body: Body) -> str:
@@ -97,15 +123,20 @@ def body_card(body: Body) -> dict[str, Any]:
         "session_running": body.session is not None,
         "session": None if body.session is None else body.session.to_dict(),
         "next": next_hint(body),
-        "cards": [
-            {
-                "alias": policy.alias,
-                "hub": policy.hub,
-                "startable": policy.startable,
-                "mode": "perpetual" if policy.startable else "episodic",
-                "preview": policy.preview_url,
-                "onnx": hub_resolve(policy.hub, "policy.onnx"),
-            }
-            for policy in body.policies
-        ],
+        "cards": [_card_row(policy) for policy in body.policies],
     }
+
+
+def _card_row(policy: Policy) -> dict[str, Any]:
+    row: dict[str, Any] = {
+        "alias": policy.alias,
+        "hub": policy.hub,
+        "startable": policy.startable,
+        "mode": "perpetual" if policy.startable else "episodic",
+        "preview": policy.preview_url,
+        "onnx": hub_resolve(policy.hub, "policy.onnx"),
+        "card": hub_card_url(policy.hub),
+    }
+    if policy.curves_url:
+        row["curves"] = policy.curves_url
+    return row

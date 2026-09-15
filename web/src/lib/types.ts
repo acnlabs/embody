@@ -1,3 +1,5 @@
+import type { ControlEvent } from "@/lib/control";
+
 export type Card = {
   alias: string;
   hub: string;
@@ -5,6 +7,8 @@ export type Card = {
   startable?: boolean;
   preview?: string;
   onnx?: string;
+  card?: string;
+  curves?: string;
 };
 
 export type BodyShow = {
@@ -17,6 +21,7 @@ export type BodyShow = {
   session_running?: boolean;
   build?: Record<string, unknown>;
   cards?: Card[];
+  control?: ControlEvent[];
   numbers?: Record<string, unknown> | null;
   numbers_error?: string;
   next?: string;

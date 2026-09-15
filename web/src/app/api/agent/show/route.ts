@@ -1,12 +1,13 @@
 import { fetchAgentId } from "@/lib/acn";
 import { asBuild } from "@/lib/build";
+import { parseControlEvent } from "@/lib/control";
 import { getBody, upsertBody } from "@/lib/ledger";
 import { extractBearerToken } from "@/lib/userAuth";
 import type { BodyShow, Card } from "@/lib/types";
 
 export const runtime = "nodejs";
 
-function asShow(raw: unknown): { show: BodyShow } | { error: string } {
+function asShow(raw: unknown): { show: BodyShow; control?: ReturnType<typeof parseControlEvent> } | { error: string } {
   if (!raw || typeof raw !== "object") {
     return { error: "show needs id, kind, origin, bound_agent_id" };
   }
@@ -36,6 +37,12 @@ function asShow(raw: unknown): { show: BodyShow } | { error: string } {
           if (typeof card.mode === "string") next.mode = card.mode;
           if (typeof card.preview === "string") next.preview = card.preview;
           if (typeof card.onnx === "string") next.onnx = card.onnx;
+          if (typeof card.card === "string" && card.card.startsWith("https://huggingface.co/")) {
+            next.card = card.card;
+          }
+          if (typeof card.curves === "string" && card.curves.startsWith("https://wandb.ai/")) {
+            next.curves = card.curves;
+          }
           return next;
         })
         .filter((card): card is Card => card != null)
@@ -59,6 +66,7 @@ function asShow(raw: unknown): { show: BodyShow } | { error: string } {
       next: typeof row.next === "string" ? row.next : undefined,
       note: typeof row.note === "string" ? row.note : undefined,
     },
+    control: parseControlEvent(row.control),
   };
 }
 
@@ -93,7 +101,7 @@ export async function POST(req: Request) {
     );
   }
   const listen = Boolean((payload as { listen?: unknown }).listen);
-  const stored = await upsertBody(show, { listen });
+  const stored = await upsertBody(show, { listen, control: parsed.control });
   return Response.json({
     ok: true,
     room: `/b/${stored.id}`,

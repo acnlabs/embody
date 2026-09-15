@@ -35,6 +35,10 @@ def hub_resolve(repo: str, filename: str) -> str:
     return f"https://huggingface.co/{repo}/resolve/main/{filename}"
 
 
+def hub_card_url(repo: str) -> str:
+    return f"https://huggingface.co/{repo}"
+
+
 @dataclass
 class AgentBind:
     agent_id: str
@@ -64,12 +68,14 @@ class Policy:
     startable: bool
     preview_url: str
     attached_at: str
+    curves_url: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Policy:
+        curves = data.get("curves_url")
         return cls(
             id=str(data["id"]),
             alias=str(data["alias"]),
@@ -78,6 +84,7 @@ class Policy:
             startable=bool(data.get("startable", False)),
             preview_url=str(data.get("preview_url") or hub_resolve(data["hub"], "preview.mp4")),
             attached_at=str(data["attached_at"]),
+            curves_url=str(curves).strip() if isinstance(curves, str) and curves.strip() else None,
         )
 
 

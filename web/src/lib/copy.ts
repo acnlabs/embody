@@ -1,6 +1,7 @@
 /** Owner-facing helpers. Words live in lib/i18n; this file stays usable on the server. */
 
 import type { Translate } from "@/lib/i18n/types";
+import type { ControlEvent } from "@/lib/control";
 
 export function agentLabel(body: { bound_agent_id: string; bound_agent_name?: string }): string {
   const name = (body.bound_agent_name || "").trim();
@@ -30,6 +31,25 @@ export function cardModeLabel(mode: string | undefined, t: Translate): string | 
   if (mode === "perpetual") return t("cards.gait");
   if (mode === "episodic") return t("cards.trick");
   return mode || null;
+}
+
+export function controlWhat(event: ControlEvent, t: Translate): string {
+  const name = event.alias || "—";
+  if (event.op === "start") return t("control.start", { name });
+  if (event.op === "stop") return t("control.stop");
+  if (event.op === "pull") return t("control.pull", { name });
+  if (event.op === "twist") return t("control.twist");
+  if (event.op === "halt") return t("control.halt");
+  if (event.op === "do") return t("control.do", { name });
+  return event.op;
+}
+
+export function twistHint(event: ControlEvent): string | null {
+  if (event.op !== "twist") return null;
+  const x = event.x ?? 0;
+  const y = event.y ?? 0;
+  const yaw = event.yaw ?? 0;
+  return `${x.toFixed(2)} · ${y.toFixed(2)} · ${yaw.toFixed(2)}`;
 }
 
 export function buildKeyLabel(key: string, t: Translate): string {

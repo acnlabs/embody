@@ -47,6 +47,8 @@ export const en = {
     captionDrive: "WASD to drive · drag to look",
     captionOrbit: "Drag to look",
     canvas: "Body pose. Drag to look around.",
+    happened: "What happened",
+    happenedEmpty: "Nothing yet.",
   },
   drive: {
     label: "Drive",
@@ -87,6 +89,18 @@ export const en = {
     noPreview: "No preview",
     gait: "Gait",
     trick: "Trick",
+    curves: "Curves",
+  },
+  control: {
+    agent: "Agent",
+    you: "You",
+    start: "started {name}",
+    stop: "stopped",
+    pull: "loaded {name}",
+    twist: "walk / turn",
+    halt: "halted",
+    do: "{name}",
+    missed: "didn't finish",
   },
   time: {
     justNow: "just now",

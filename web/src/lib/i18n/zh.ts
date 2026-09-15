@@ -49,6 +49,8 @@ export const zh: Messages = {
     captionDrive: "WASD 开车 · 拖动转视角",
     captionOrbit: "拖动转视角",
     canvas: "身体姿势，拖动转视角",
+    happened: "刚发生的",
+    happenedEmpty: "还没有。",
   },
   drive: {
     label: "开车",
@@ -89,6 +91,18 @@ export const zh: Messages = {
     noPreview: "无预览",
     gait: "步态",
     trick: "招式",
+    curves: "曲线",
+  },
+  control: {
+    agent: "Agent",
+    you: "你",
+    start: "开始了 {name}",
+    stop: "停了",
+    pull: "装上了 {name}",
+    twist: "走 / 转",
+    halt: "停步",
+    do: "{name}",
+    missed: "没做完",
   },
   time: {
     justNow: "刚刚",

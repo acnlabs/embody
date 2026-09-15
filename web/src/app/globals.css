@@ -651,6 +651,60 @@ pre code { background: none; border: none; padding: 0; }
 .skill-card .hub a { color: var(--ink-soft); }
 .skill-card .hub a:hover { color: var(--accent); }
 
+.control-log {
+  background: var(--paper-2);
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  padding: 0.2rem 0.85rem;
+}
+
+.control-row {
+  display: grid;
+  grid-template-columns: 4.5rem 1fr auto;
+  gap: 0.55rem 0.75rem;
+  align-items: baseline;
+  padding: 0.4rem 0;
+}
+
+.control-row + .control-row { border-top: 1px dashed var(--line-strong); }
+
+.control-who {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.control-what {
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+
+.control-when {
+  font-size: 0.75rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.control-hint {
+  grid-column: 2 / 3;
+  margin-top: -0.15rem;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+@media (max-width: 640px) {
+  .control-row {
+    grid-template-columns: 1fr auto;
+  }
+  .control-who { grid-column: 1 / 2; }
+  .control-what { grid-column: 1 / 2; }
+  .control-when { grid-column: 2 / 3; grid-row: 1 / 3; }
+  .control-hint { grid-column: 1 / 2; }
+}
+
 /* ---------- Misc ---------- */
 .warn { color: var(--warn); }
 .meta { color: var(--muted); font-size: 0.9rem; }
