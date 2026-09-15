@@ -124,6 +124,7 @@ def body_card(body: Body) -> dict[str, Any]:
         "session": None if body.session is None else body.session.to_dict(),
         "next": next_hint(body),
         "cards": [_card_row(policy) for policy in body.policies],
+        "training": None if body.training is None else body.training.to_dict(),
     }
 
 

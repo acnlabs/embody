@@ -3,9 +3,44 @@ import { asBuild } from "@/lib/build";
 import { parseControlEvent } from "@/lib/control";
 import { getBody, upsertBody } from "@/lib/ledger";
 import { extractBearerToken } from "@/lib/userAuth";
-import type { BodyShow, Card } from "@/lib/types";
+import type { BodyShow, Card, Training } from "@/lib/types";
 
 export const runtime = "nodejs";
+
+function watchUrl(raw: unknown): string | undefined {
+  if (typeof raw !== "string") return undefined;
+  try {
+    const url = new URL(raw.trim());
+    const host = url.hostname.toLowerCase();
+    if (url.protocol !== "https:") return undefined;
+    if (
+      host !== "huggingface.co" &&
+      host !== "www.huggingface.co" &&
+      host !== "wandb.ai" &&
+      host !== "www.wandb.ai"
+    ) {
+      return undefined;
+    }
+    return url.toString().split("?")[0].slice(0, 240);
+  } catch {
+    return undefined;
+  }
+}
+
+function parseTraining(raw: unknown): Training | null | undefined {
+  if (raw == null) return null;
+  if (typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const row = raw as Record<string, unknown>;
+  const alias = String(row.alias ?? "").trim().slice(0, 64);
+  if (!alias) return undefined;
+  const next: Training = { alias };
+  if (typeof row.started_at === "string" && row.started_at.trim()) {
+    next.started_at = row.started_at.trim();
+  }
+  const url = watchUrl(row.url);
+  if (url) next.url = url;
+  return next;
+}
 
 function asShow(raw: unknown): { show: BodyShow; control?: ReturnType<typeof parseControlEvent> } | { error: string } {
   if (!raw || typeof raw !== "object") {
@@ -47,25 +82,33 @@ function asShow(raw: unknown): { show: BodyShow; control?: ReturnType<typeof par
         })
         .filter((card): card is Card => card != null)
     : [];
+  const show: BodyShow = {
+    id,
+    name: typeof row.name === "string" ? row.name : id,
+    kind,
+    origin,
+    bound_agent_id: bound,
+    session_running: Boolean(row.session_running),
+    build,
+    cards,
+    numbers:
+      row.numbers && typeof row.numbers === "object"
+        ? (row.numbers as Record<string, unknown>)
+        : null,
+    numbers_error:
+      typeof row.numbers_error === "string" ? row.numbers_error.slice(0, 240) : undefined,
+    next: typeof row.next === "string" ? row.next : undefined,
+    note: typeof row.note === "string" ? row.note : undefined,
+  };
+  if ("training" in row) {
+    const training = parseTraining(row.training);
+    if (row.training != null && training === undefined) {
+      return { error: "training needs alias" };
+    }
+    show.training = training ?? null;
+  }
   return {
-    show: {
-      id,
-      name: typeof row.name === "string" ? row.name : id,
-      kind,
-      origin,
-      bound_agent_id: bound,
-      session_running: Boolean(row.session_running),
-      build,
-      cards,
-      numbers:
-        row.numbers && typeof row.numbers === "object"
-          ? (row.numbers as Record<string, unknown>)
-          : null,
-      numbers_error:
-        typeof row.numbers_error === "string" ? row.numbers_error.slice(0, 240) : undefined,
-      next: typeof row.next === "string" ? row.next : undefined,
-      note: typeof row.note === "string" ? row.note : undefined,
-    },
+    show,
     control: parseControlEvent(row.control),
   };
 }

@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires a joined ACN agent (ACN_API_KEY from POST /agents/join). First body kind needs microduck-plugin / microduck-skill. Optional: EMBODY_HOME, EMBODY_MICRODUCK_SKILL, ACN_BASE_URL, EMBODY_STUDIO_URL."
 metadata:
   author: acnlabs
-  version: "0.1.18"
+  version: "0.1.19"
   homepage: "https://github.com/acnlabs/embody"
   repository: "https://github.com/acnlabs/embody"
   product: embody
@@ -77,11 +77,25 @@ python3 -m embody policy attach --body duck-1 --hub neil-jo/microduck-walk --as 
 python3 -m embody policy attach --body duck-1 --hub neil-jo/microduck-polite-bow --as polite_bow --episodic
 ```
 
-If `EMBODY_STUDIO_URL` is set, attach **pushes** the card grid so the owner room shows the Hub card (and `curves` if the manifest had wandb) without `session start`. That push is not a drive verb — do not send `control`.
+If `EMBODY_STUDIO_URL` is set, attach **pushes** the card grid so the owner room shows the Hub card (and `curves` if the manifest had wandb) without `session start`. That push is not a drive verb — do not send `control`. Attaching the same `--as` you marked with `training start` also clears the Training pointer.
 
 Preview is on the model card. A raw `/resolve/main/preview.mp4` click downloads.
 
-## 4. Drive
+## 4. Tell the owner you are training
+
+Embody has no trainer. Use the kind runtime (Microduck: microduck-skill / Hugging Face Jobs) to train. After that run has started, point the owner room at it:
+
+```bash
+python3 -m embody training start --body duck-1 --as polite_bow --url https://huggingface.co/jobs/USER/JOB
+```
+
+`--url` is optional. If you have a page, it must be `https` on huggingface.co or wandb.ai. The owner sees **Training …** and **Watch** — not Jobs, not python. Do not send `control`. When you `policy attach` that same `--as`, the pointer clears. Otherwise:
+
+```bash
+python3 -m embody training clear --body duck-1
+```
+
+## 5. Drive
 
 `session start` calls `prepare` first. Walk is perpetual. Bow is episodic — `do`, never start that repo. v0 only drives `origin=sim`.
 
@@ -96,7 +110,7 @@ python3 -m embody session halt --body duck-1
 python3 -m embody session stop --body duck-1
 ```
 
-## 5. Read numbers, then you reply on ACN
+## 6. Read numbers, then you reply on ACN
 
 `session start` / `pull` / `do` already include `show`. `do` lifts the same body card the runtime prints (`tilt_deg`, feet, joints, `executed`, …). Later:
 
@@ -122,7 +136,7 @@ Session verbs: [body-runtime-v0.md](../../docs/product/body-runtime-v0.md).
 
 - Start with `whoami`. Create and bind first.
 - Search Hub from Embody. Find `USER/NAME` yourself, then `policy attach --hub`.
-- Invent a trainer, a store, a ranking, or a fallen verdict.
+- Invent a trainer, a store, a ranking, or a fallen verdict. `training start` only points the owner at a run the kind runtime already started.
 - Commit ONNX / checkpoints / JSONL into this git.
 - Merge this repo with microduck-plugin.
 - Drive or manage a body through ACN or AgentPlanet. Do not store ACN task ids in Embody.

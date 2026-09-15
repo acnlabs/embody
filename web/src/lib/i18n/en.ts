@@ -21,6 +21,7 @@ export const en = {
     tilt: "Tilt {n}°",
     moduleOff: "no",
     figure: "This body's figure",
+    training: "Training {name}",
   },
   origin: {
     sim: "Sim",
@@ -50,6 +51,10 @@ export const en = {
     happened: "What happened",
     happenedEmpty: "Nothing yet.",
     chat: "Chat",
+  },
+  training: {
+    now: "Training {name}",
+    watch: "Watch",
   },
   drive: {
     label: "Drive",

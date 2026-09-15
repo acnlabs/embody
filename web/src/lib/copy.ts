@@ -10,6 +10,11 @@ export function agentLabel(body: { bound_agent_id: string; bound_agent_name?: st
   return id.slice(0, 8);
 }
 
+export function trickLabel(alias: string): string {
+  const text = alias.replace(/_/g, " ").trim();
+  return text || alias;
+}
+
 export function originLabel(origin: string, t: Translate): string {
   if (origin === "robot") return t("origin.robot");
   if (origin === "sim") return t("origin.sim");

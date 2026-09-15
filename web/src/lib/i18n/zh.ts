@@ -23,6 +23,7 @@ export const zh: Messages = {
     tilt: "倾斜 {n}°",
     moduleOff: "无",
     figure: "这具身体的外形",
+    training: "正在训 {name}",
   },
   origin: {
     sim: "仿真",
@@ -52,6 +53,10 @@ export const zh: Messages = {
     happened: "刚发生的",
     happenedEmpty: "还没有。",
     chat: "对话",
+  },
+  training: {
+    now: "正在训 {name}",
+    watch: "看进度",
   },
   drive: {
     label: "开车",

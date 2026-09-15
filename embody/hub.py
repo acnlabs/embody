@@ -3,10 +3,13 @@ from __future__ import annotations
 import json
 import os
 import urllib.error
+import urllib.parse
 import urllib.request
 from typing import Any
 
 from embody.models import hub_resolve
+
+_WATCH_HOSTS = {"huggingface.co", "www.huggingface.co", "wandb.ai", "www.wandb.ai"}
 
 
 def curves_url_from_training(training: dict[str, Any]) -> str | None:
@@ -28,6 +31,18 @@ def _as_wandb_url(raw: Any) -> str | None:
     if len(parts) == 3 and not text.startswith("http"):
         return f"https://wandb.ai/{parts[0]}/{parts[1]}/runs/{parts[2]}"
     return None
+
+
+def watch_page_url(raw: Any) -> str | None:
+    """Owner Watch link. Hugging Face or wandb https only."""
+    text = str(raw or "").strip()
+    if not text:
+        return None
+    parsed = urllib.parse.urlparse(text)
+    host = (parsed.hostname or "").lower()
+    if parsed.scheme != "https" or host not in _WATCH_HOSTS:
+        return None
+    return text.split("?", 1)[0][:240]
 
 
 def lift_curves_url(hub: str, *, timeout: float = 2.0) -> str | None:

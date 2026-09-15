@@ -5,7 +5,7 @@ import { useAuth0 } from "@auth0/auth0-react";
 import { useEffect, useState } from "react";
 import { AUTH0_AUDIENCE, AUTH0_CLIENT_ID } from "@/lib/auth0";
 import DuckSnapshot from "@/components/DuckSnapshot";
-import { originLabel, ownerError, sessionLabel, agentLabel, bodyIsLive } from "@/lib/copy";
+import { originLabel, ownerError, sessionLabel, agentLabel, bodyIsLive, trickLabel } from "@/lib/copy";
 import { poseFromNumbers } from "@/lib/duckPose";
 import { useI18n, type Translate } from "@/lib/i18n";
 import type { BodyShow } from "@/lib/types";
@@ -104,6 +104,9 @@ export function BodyCard({ body }: { body: BodyShow }) {
         <p className="meta">
           {originLabel(body.origin, t)} · {t("home.bound", { agent: agentLabel(body) })}
           {tricks ? ` · ${t("home.tricks", { n: tricks })}` : ""}
+          {body.training?.alias
+            ? ` · ${t("home.training", { name: trickLabel(body.training.alias) })}`
+            : ""}
         </p>
         <ModuleChips body={body} />
       </div>

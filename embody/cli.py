@@ -28,6 +28,7 @@ from embody.models import (
     Policy,
     Session,
     State,
+    Training,
     asset_ref,
     hub_card_url,
     hub_resolve,
@@ -37,7 +38,7 @@ from embody.models import (
 )
 from embody.join import JoinError, join_body, leave_body, studio_configured
 from embody.push import PushError, post_pose, post_show, push_document, take_inbox, transient_push_error
-from embody.hub import lift_curves_url
+from embody.hub import lift_curves_url, watch_page_url
 from embody.show import (
     agent_control,
     body_card,
@@ -446,6 +447,8 @@ def cmd_policy_attach(args: argparse.Namespace) -> int:
     )
     body.policies = [p for p in body.policies if p.alias != alias]
     body.policies.append(policy)
+    if body.training is not None and body.training.alias == alias:
+        body.training = None
     path = save(state)
     payload: dict[str, Any] = {
         "ok": True,
@@ -477,6 +480,54 @@ def cmd_policy_list(args: argparse.Namespace) -> int:
             "policies": [p.to_dict() for p in body.policies],
         }
     )
+
+
+def _training_alias(raw: str | None) -> str:
+    alias = (raw or "").strip()
+    if not alias or any(c in alias for c in "\n\r\t") or len(alias) > 64:
+        raise CliError("training start needs --as (the trick name, e.g. polite_bow)")
+    return alias
+
+
+def cmd_training_start(args: argparse.Namespace) -> int:
+    alias = _training_alias(args.as_name)
+    url_raw = (args.url or "").strip()
+    url = watch_page_url(url_raw) if url_raw else None
+    if url_raw and url is None:
+        raise CliError("training --url must be https huggingface.co or wandb.ai")
+    state = load()
+    body = _resolve_body(state, args.body)
+    body.training = Training(alias=alias, started_at=utc_now(), url=url)
+    path = save(state)
+    payload: dict[str, Any] = {
+        "ok": True,
+        "body": body.name or body.id,
+        "training": body.training.to_dict(),
+        "state": str(path),
+        "note": "owner room pointer; Embody does not train. Use the kind runtime / microduck-skill.",
+    }
+    pushed = _owner_push(body)
+    if pushed is not None:
+        payload["pushed"] = pushed
+    return _dump(payload)
+
+
+def cmd_training_clear(args: argparse.Namespace) -> int:
+    state = load()
+    body = _resolve_body(state, args.body)
+    body.training = None
+    path = save(state)
+    payload: dict[str, Any] = {
+        "ok": True,
+        "body": body.name or body.id,
+        "training": None,
+        "state": str(path),
+        "note": "owner room pointer cleared",
+    }
+    pushed = _owner_push(body)
+    if pushed is not None:
+        payload["pushed"] = pushed
+    return _dump(payload)
 
 
 def _startable_policy(body: Body, alias: str | None) -> Policy:
@@ -1055,6 +1106,20 @@ def build_parser() -> argparse.ArgumentParser:
     plisted = policy_sub.add_parser("list")
     _add_body_flag(plisted)
     plisted.set_defaults(func=cmd_policy_list)
+
+    training = sub.add_parser(
+        "training",
+        help="point the owner at a kind-runtime train (not a trainer)",
+    )
+    training_sub = training.add_subparsers(dest="training_cmd", required=True)
+    tstart = training_sub.add_parser("start", help="show Training … in the owner room")
+    tstart.add_argument("--as", dest="as_name", required=True, help="trick name the owner sees")
+    tstart.add_argument("--url", help="https huggingface.co or wandb.ai page")
+    _add_body_flag(tstart)
+    tstart.set_defaults(func=cmd_training_start)
+    tclear = training_sub.add_parser("clear", help="drop the Training pointer")
+    _add_body_flag(tclear)
+    tclear.set_defaults(func=cmd_training_clear)
 
     session = sub.add_parser("session", help="studio session on one body")
     session_sub = session.add_subparsers(dest="session_cmd", required=True)

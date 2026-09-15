@@ -469,6 +469,85 @@ def test_policy_attach_pushes_cards_not_control(
         stub.close()
 
 
+def test_training_pointer_pushes_without_control(
+    home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from embody.hub import watch_page_url
+
+    assert watch_page_url("https://huggingface.co/jobs/neil-jo/abc") == (
+        "https://huggingface.co/jobs/neil-jo/abc"
+    )
+    assert watch_page_url("https://evil.example/jobs") is None
+    add_sim("duck-1")
+    bind_offline()
+    stub = RegistryStub()
+    try:
+        monkeypatch.setenv("EMBODY_STUDIO_URL", stub.url)
+        monkeypatch.setenv("ACN_API_KEY", "acn_test")
+        capsys.readouterr()
+        assert main(["join", "--body", "duck-1"]) == 0
+        capsys.readouterr()
+        assert (
+            main(
+                [
+                    "training",
+                    "start",
+                    "--as",
+                    "polite_bow",
+                    "--url",
+                    "https://huggingface.co/jobs/neil-jo/abc",
+                ]
+            )
+            == 0
+        )
+        started = json.loads(capsys.readouterr().out)
+        assert started["training"]["alias"] == "polite_bow"
+        assert "control" not in started
+        shows = [row for row in stub.requests if row["path"] == "/api/agent/show"]
+        show = shows[-1]["body"]["show"]
+        assert show["training"]["alias"] == "polite_bow"
+        assert show["training"]["url"] == "https://huggingface.co/jobs/neil-jo/abc"
+        assert "control" not in show
+        capsys.readouterr()
+        assert main(["policy", "attach", "--hub", "neil-jo/microduck-walk", "--as", "walk"]) == 0
+        after_other = json.loads(capsys.readouterr().out)
+        assert load().bodies[0].training.alias == "polite_bow"
+        assert after_other["pushed"]["ok"] is True
+        capsys.readouterr()
+        assert (
+            main(
+                [
+                    "policy",
+                    "attach",
+                    "--hub",
+                    "neil-jo/microduck-polite-bow",
+                    "--as",
+                    "polite_bow",
+                    "--episodic",
+                ]
+            )
+            == 0
+        )
+        assert load().bodies[0].training is None
+        cleared_show = [row for row in stub.requests if row["path"] == "/api/agent/show"][-1]["body"][
+            "show"
+        ]
+        assert cleared_show["training"] is None
+        assert "control" not in cleared_show
+    finally:
+        stub.close()
+
+
+def test_training_rejects_bad_url(home: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    add_sim("duck-1")
+    bind_offline()
+    capsys.readouterr()
+    assert main(["training", "start", "--as", "bow", "--url", "https://example.com/x"]) == 1
+    err = json.loads(capsys.readouterr().err)
+    assert err["ok"] is False
+    assert load().bodies[0].training is None
+
+
 def test_show_keeps_cards_when_runtime_status_fails(
     home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:

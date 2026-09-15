@@ -17,6 +17,7 @@ import {
   agentLabel,
   bodyIsLive,
   controlWhat,
+  trickLabel,
   twistHint,
 } from "@/lib/copy";
 import { formatAgo, useI18n, type Translate } from "@/lib/i18n";
@@ -321,6 +322,19 @@ export function RoomView({
             </button>
           ) : null}
         </div>
+        {body.training?.alias ? (
+          <p className="training-banner">
+            {t("training.now", { name: trickLabel(body.training.alias) })}
+            {body.training.url ? (
+              <>
+                {" "}
+                <a href={body.training.url} target="_blank" rel="noreferrer">
+                  {t("training.watch")}
+                </a>
+              </>
+            ) : null}
+          </p>
+        ) : null}
       </header>
 
       <div className="stage">

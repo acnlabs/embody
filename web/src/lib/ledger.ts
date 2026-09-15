@@ -68,6 +68,7 @@ function persistShow(show: BodyShow): BodyShow {
   const stored = { ...show };
   delete stored.drive_listening;
   delete stored.bound_agent_name;
+  if (!stored.training) delete stored.training;
   return stored;
 }
 
@@ -92,6 +93,7 @@ export async function upsertBody(
 ): Promise<BodyShow> {
   const existing = (await readLedger()).bodies[show.id];
   const now = new Date().toISOString();
+  const training = show.training !== undefined ? show.training : existing?.training;
   const stored: BodyShow = persistShow({
     ...show,
     joined_at: existing?.joined_at,
@@ -99,6 +101,7 @@ export async function upsertBody(
     build: show.build ?? existing?.build,
     drive_listen_at: opts?.listen ? now : existing?.drive_listen_at,
     control: appendControl(existing?.control, opts?.control),
+    training: training ?? null,
   });
   if (useKv()) {
     const client = await kv();

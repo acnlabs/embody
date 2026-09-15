@@ -11,6 +11,12 @@ export type Card = {
   curves?: string;
 };
 
+export type Training = {
+  alias: string;
+  started_at?: string;
+  url?: string;
+};
+
 export type BodyShow = {
   id: string;
   name?: string;
@@ -22,6 +28,7 @@ export type BodyShow = {
   build?: Record<string, unknown>;
   cards?: Card[];
   control?: ControlEvent[];
+  training?: Training | null;
   numbers?: Record<string, unknown> | null;
   numbers_error?: string;
   next?: string;

@@ -89,6 +89,33 @@ class Policy:
 
 
 @dataclass
+class Training:
+    """Owner pointer only. Embody does not train."""
+
+    alias: str
+    started_at: str
+    url: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        row: dict[str, Any] = {"alias": self.alias, "started_at": self.started_at}
+        if self.url:
+            row["url"] = self.url
+        return row
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Training | None:
+        alias = str(data.get("alias") or "").strip()
+        if not alias:
+            return None
+        url = data.get("url")
+        return cls(
+            alias=alias[:64],
+            started_at=str(data.get("started_at") or utc_now()),
+            url=str(url).strip() if isinstance(url, str) and url.strip() else None,
+        )
+
+
+@dataclass
 class Session:
     id: str
     started_at: str
@@ -130,6 +157,7 @@ class Body:
     build: dict[str, Any] = field(default_factory=dict)
     policies: list[Policy] = field(default_factory=list)
     session: Session | None = None
+    training: Training | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -144,12 +172,19 @@ class Body:
             "build": self.build,
             "policies": [p.to_dict() for p in self.policies],
             "session": None if self.session is None else self.session.to_dict(),
+            "training": None if self.training is None else self.training.to_dict(),
         }
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Body:
         policies = [Policy.from_dict(p) for p in data.get("policies") or []]
         session = data.get("session")
+        raw_training = data.get("training")
+        training = (
+            Training.from_dict(raw_training)
+            if isinstance(raw_training, dict)
+            else None
+        )
         bound = data["bound_agent_id"] if "bound_agent_id" in data else None
         build = data.get("build")
         return cls(
@@ -164,6 +199,7 @@ class Body:
             build=dict(build) if isinstance(build, dict) else {},
             policies=policies,
             session=None if session is None else Session.from_dict(session),
+            training=training,
         )
 
     def policy_by_alias(self, alias: str) -> Policy | None:
