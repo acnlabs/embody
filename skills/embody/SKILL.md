@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires a joined ACN agent (ACN_API_KEY from POST /agents/join). First body kind needs microduck-plugin / microduck-skill. Optional: EMBODY_HOME, EMBODY_MICRODUCK_SKILL, ACN_BASE_URL, EMBODY_STUDIO_URL."
 metadata:
   author: acnlabs
-  version: "0.1.16"
+  version: "0.1.17"
   homepage: "https://github.com/acnlabs/embody"
   repository: "https://github.com/acnlabs/embody"
   product: embody
@@ -76,6 +76,8 @@ Attach `--as` must match the runtime skill slot (`polite_bow`), not the Hub repo
 python3 -m embody policy attach --body duck-1 --hub neil-jo/microduck-walk --as walk
 python3 -m embody policy attach --body duck-1 --hub neil-jo/microduck-polite-bow --as polite_bow --episodic
 ```
+
+If `EMBODY_STUDIO_URL` is set, attach **pushes** the card grid so the owner room shows the Hub card (and `curves` if the manifest had wandb) without `session start`. That push is not a drive verb — do not send `control`.
 
 Preview is on the model card. A raw `/resolve/main/preview.mp4` click downloads.
 

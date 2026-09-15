@@ -444,6 +444,31 @@ def test_session_do_pushes_owner_show(
         stub.close()
 
 
+def test_policy_attach_pushes_cards_not_control(
+    home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    add_sim("duck-1")
+    bind_offline()
+    stub = RegistryStub()
+    try:
+        monkeypatch.setenv("EMBODY_STUDIO_URL", stub.url)
+        monkeypatch.setenv("ACN_API_KEY", "acn_test")
+        capsys.readouterr()
+        assert main(["join", "--body", "duck-1"]) == 0
+        capsys.readouterr()
+        assert main(["policy", "attach", "--hub", "neil-jo/microduck-walk", "--as", "walk"]) == 0
+        out = json.loads(capsys.readouterr().out)
+        assert out["pushed"]["ok"] is True
+        shows = [row for row in stub.requests if row["path"] == "/api/agent/show"]
+        assert shows
+        show = shows[-1]["body"]["show"]
+        assert "control" not in show
+        walk = next(row for row in show["cards"] if row["alias"] == "walk")
+        assert walk["card"] == "https://huggingface.co/neil-jo/microduck-walk"
+    finally:
+        stub.close()
+
+
 def test_show_keeps_cards_when_runtime_status_fails(
     home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:

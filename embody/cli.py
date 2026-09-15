@@ -447,21 +447,24 @@ def cmd_policy_attach(args: argparse.Namespace) -> int:
     body.policies = [p for p in body.policies if p.alias != alias]
     body.policies.append(policy)
     path = save(state)
-    return _dump(
-        {
-            "ok": True,
-            "body": body.name or body.id,
-            "policy": policy.to_dict(),
-            "card": {
-                "preview": policy.preview_url,
-                "onnx": hub_resolve(hub, "policy.onnx"),
-                "card": hub_card_url(hub),
-                "curves": policy.curves_url,
-                "note": "resolve/main on a card plays; a raw click downloads",
-            },
-            "state": str(path),
-        }
-    )
+    payload: dict[str, Any] = {
+        "ok": True,
+        "body": body.name or body.id,
+        "policy": policy.to_dict(),
+        "card": {
+            "preview": policy.preview_url,
+            "onnx": hub_resolve(hub, "policy.onnx"),
+            "card": hub_card_url(hub),
+            "curves": policy.curves_url,
+            "note": "resolve/main on a card plays; a raw click downloads",
+        },
+        "state": str(path),
+        "note": "owner room cards follow this push; it is not a drive verb",
+    }
+    pushed = _owner_push(body)
+    if pushed is not None:
+        payload["pushed"] = pushed
+    return _dump(payload)
 
 
 def cmd_policy_list(args: argparse.Namespace) -> int:
