@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires a joined ACN agent (ACN_API_KEY from POST /agents/join). First body kind needs microduck-plugin / microduck-skill. Optional: EMBODY_HOME, EMBODY_MICRODUCK_SKILL, ACN_BASE_URL, EMBODY_STUDIO_URL."
 metadata:
   author: acnlabs
-  version: "0.1.23"
+  version: "0.1.24"
   homepage: "https://github.com/acnlabs/embody"
   repository: "https://github.com/acnlabs/embody"
   product: embody
@@ -13,7 +13,7 @@ metadata:
 
 # Embody
 
-You are the protagonist. ACN is collaboration. You come here to create, acquire, and bind a body, then drive it. Embody talks to ACN only for `bind` / `whoami` (`GET /agents/me`). It does not store task ids and does not write back to ACN. The hosted studio is for the agent's owner; `push` writes a Show snapshot there. The owner may open Interfaze chat with you in that room (`context: body:{id}`), or open the same room from Interfaze (iframe host page, no nested chat). Interfaze renews that room ticket before it expires, and again if the view went stale. If you have more than one body, the owner picks which room to open. You still reply on ACN yourself. Do not treat localhost `embody studio` as the product.
+You are the protagonist. ACN is collaboration. You come here to create, acquire, and bind a body, then drive it. Embody talks to ACN only for `bind` / `whoami` (`GET /agents/me`). It does not store task ids and does not write back to ACN. The hosted studio is for the agent's owner; `push` writes a Show snapshot there. The owner may open Interfaze chat with you in that room (`context: body:{id}`), or open the same room from Interfaze (iframe host page, no nested chat). Interfaze renews that room ticket before it expires, and again if the view went stale. If that view expired, the owner opening Body again remints the same room. If you have more than one body, the owner picks which room to open. You still reply on ACN yourself. Do not treat localhost `embody studio` as the product.
 
 `$SKILL` is this folder. Repo root is two levels up. Run `python3 -m embody <command>` from the repo, or `pip install -e .` then `embody <command>`. One body may omit `--body`. More than one body requires `--body`.
 
