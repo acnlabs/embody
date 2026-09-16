@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useAuth0 } from "@auth0/auth0-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { isHostParentOrigin, readHostTokenFromHash } from "@/lib/hostFrame";
 import { AUTH0_AUDIENCE, AUTH0_CLIENT_ID } from "@/lib/auth0";
 import DuckSnapshot from "@/components/DuckSnapshot";
@@ -375,7 +375,7 @@ function OwnedRoom({
   bodyId: string;
   getBearer: () => Promise<string | null>;
   enabled: boolean;
-  onUnauthorized?: () => void;
+  onUnauthorized?: (failedToken?: string) => void;
   showChat?: boolean;
   backOnError?: boolean;
 }) {
@@ -404,7 +404,7 @@ function OwnedRoom({
         const json = (await res.json()) as { show?: BodyShow; error?: string };
         if (cancel) return;
         if (res.status === 401 && onUnauthorized) {
-          onUnauthorized();
+          onUnauthorized(token);
           return;
         }
         if (!res.ok) setErr(ownerError(json.error || res.statusText, t));
@@ -443,7 +443,7 @@ function OwnedRoom({
         };
         if (cancel) return;
         if (res.status === 401 && onUnauthorized) {
-          onUnauthorized();
+          onUnauthorized(token);
           return;
         }
         if (!res.ok) return;
@@ -501,7 +501,7 @@ function OwnedRoom({
       });
       const json = (await res.json()) as { error?: string; control?: ControlEvent[] };
       if (res.status === 401 && onUnauthorized) {
-        onUnauthorized();
+        onUnauthorized(token);
         return t("error.signIn");
       }
       if (!res.ok) return ownerError(json.error || res.statusText, t);
@@ -566,21 +566,37 @@ function SignedRoom({ bodyId }: { bodyId: string }) {
   );
 }
 
-function notifyHostExpired() {
+function hostParentOrigin(): string {
   try {
-    const origin = document.referrer ? new URL(document.referrer).origin : "";
-    if (window.parent !== window && isHostParentOrigin(origin)) {
-      window.parent.postMessage({ type: "talk:expired" }, origin);
+    if (document.referrer) {
+      const origin = new URL(document.referrer).origin;
+      if (isHostParentOrigin(origin)) return origin;
     }
   } catch {
     /* ignore */
   }
+  try {
+    const ancestor = document.location.ancestorOrigins?.[0];
+    if (ancestor && isHostParentOrigin(ancestor)) return ancestor;
+  } catch {
+    /* ignore */
+  }
+  return "";
+}
+
+function notifyHostExpired() {
+  const origin = hostParentOrigin();
+  if (!origin || window.parent === window) return;
+  const chatId = new URLSearchParams(window.location.search).get("chatId")?.trim() || "";
+  window.parent.postMessage({ type: "talk:expired", chatId }, origin);
 }
 
 function HostRoom({ bodyId }: { bodyId: string }) {
   const { t } = useI18n();
   const [token, setToken] = useState("");
   const [ready, setReady] = useState(false);
+  const tokenRef = useRef("");
+  tokenRef.current = token;
 
   useEffect(() => {
     const th = readHostTokenFromHash(window.location.hash);
@@ -599,7 +615,11 @@ function HostRoom({ bodyId }: { bodyId: string }) {
   }, []);
 
   const getBearer = useCallback(async () => token || null, [token]);
-  const onUnauthorized = useCallback(() => {
+  const onUnauthorized = useCallback((failed?: string) => {
+    const cur = tokenRef.current;
+    if (failed && failed !== cur) return;
+    if (!cur) return;
+    tokenRef.current = "";
     setToken("");
     notifyHostExpired();
   }, []);
