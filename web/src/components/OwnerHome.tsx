@@ -90,7 +90,6 @@ export function BodyCard({ body }: { body: BodyShow }) {
           {body.kind === "microduck" ? (
             <DuckSnapshot pose={pose} ariaLabel={t("home.figure")} still />
           ) : null}
-          <span className="badge">{body.kind}</span>
           <span className={`status${liveNow ? " on" : ""}`}>
             {sessionLabel(liveNow, t)}
           </span>

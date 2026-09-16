@@ -308,7 +308,6 @@ export function RoomView({
       <header className="room-head">
         <div className="title-row">
           <h2>{body.name || body.id}</h2>
-          <span className="badge">{body.kind}</span>
           <span className="badge">{originLabel(body.origin, t)}</span>
           <span className={`status${bodyIsLive(body) ? " on" : ""}`}>
             {sessionLabel(bodyIsLive(body), t)}
