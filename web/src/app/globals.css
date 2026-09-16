@@ -178,6 +178,20 @@ button.lang-btn.on:hover { color: var(--paper-2); }
 main { max-width: 76rem; margin: 0 auto; padding: 2rem 1rem 4rem; }
 @media (min-width: 640px) { main { padding: 2rem 1.5rem 4rem; } }
 
+html.embody-host,
+html.embody-host body {
+  min-height: 100%;
+  background-color: var(--paper);
+}
+html.embody-host main {
+  max-width: none;
+  padding: 0.85rem 1rem 1.5rem;
+}
+html.embody-host .topbar,
+html.embody-host footer {
+  display: none;
+}
+
 html.interfaze-dock-open main {
   padding-right: calc(var(--interfaze-dock-width) + 1.5rem);
 }

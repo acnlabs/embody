@@ -52,6 +52,10 @@ export const en = {
     happenedEmpty: "Nothing yet.",
     chat: "Chat",
   },
+  host: {
+    expiredTitle: "This view expired",
+    expiredHint: "Open the body again from chat.",
+  },
   training: {
     now: "Training {name}",
     watch: "Watch",

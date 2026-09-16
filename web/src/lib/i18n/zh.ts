@@ -54,6 +54,10 @@ export const zh: Messages = {
     happenedEmpty: "还没有。",
     chat: "对话",
   },
+  host: {
+    expiredTitle: "这面窗过期了",
+    expiredHint: "请从对话里再打开这具身体。",
+  },
   training: {
     now: "正在训 {name}",
     watch: "看进度",

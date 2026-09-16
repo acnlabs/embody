@@ -4,6 +4,7 @@ import { appendControl, type ControlEvent } from "@/lib/control";
 import type { DriveCmd } from "@/lib/drive";
 import { isDriveFresh } from "@/lib/drive";
 import type { BodyPose, BodyShow } from "@/lib/types";
+import { bareAgentId } from "@/lib/myAgents";
 
 type Ledger = {
   bodies: Record<string, BodyShow>;
@@ -199,8 +200,10 @@ export async function getBody(id: string): Promise<BodyShow | null> {
 }
 
 export async function listBodiesForAgents(agentIds: string[]): Promise<BodyShow[]> {
-  const allow = new Set(agentIds);
-  return Object.values((await readLedger()).bodies).filter((row) => allow.has(row.bound_agent_id));
+  const allow = new Set(agentIds.map(bareAgentId).filter(Boolean));
+  return Object.values((await readLedger()).bodies).filter((row) =>
+    allow.has(bareAgentId(row.bound_agent_id)),
+  );
 }
 
 export async function deleteBody(id: string): Promise<BodyShow | null> {

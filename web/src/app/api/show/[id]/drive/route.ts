@@ -1,10 +1,8 @@
 import { randomBytes } from "crypto";
 import { parseControlEvent, type ControlEvent } from "@/lib/control";
-import { OWNER_ERR } from "@/lib/copy";
 import { parseDrive } from "@/lib/drive";
-import { appendBodyControl, getBody, putDrive } from "@/lib/ledger";
-import { fetchMyAgents } from "@/lib/myAgents";
-import { extractBearerToken, verifyUserToken } from "@/lib/userAuth";
+import { appendBodyControl, putDrive } from "@/lib/ledger";
+import { assertOwnedBody } from "@/lib/ownerBody";
 
 export const runtime = "nodejs";
 
@@ -12,22 +10,10 @@ export async function POST(
   req: Request,
   ctx: { params: Promise<{ id: string }> },
 ) {
-  const sub = await verifyUserToken(req);
-  if (!sub) {
-    return Response.json({ ok: false, error: OWNER_ERR.login }, { status: 401 });
-  }
   const { id } = await ctx.params;
-  const body = await getBody(id);
-  if (!body) {
-    return Response.json({ ok: false, error: OWNER_ERR.missing }, { status: 404 });
-  }
-  const bearer = extractBearerToken(req);
-  const mine = bearer ? await fetchMyAgents(bearer) : null;
-  if (mine == null) {
-    return Response.json({ ok: false, error: OWNER_ERR.down }, { status: 502 });
-  }
-  if (!mine.some((row) => row.id === body.bound_agent_id)) {
-    return Response.json({ ok: false, error: OWNER_ERR.forbidden }, { status: 403 });
+  const owned = await assertOwnedBody(req, id);
+  if ("error" in owned) {
+    return Response.json({ ok: false, error: owned.error }, { status: owned.status });
   }
   let payload: unknown;
   try {
@@ -47,7 +33,7 @@ export async function POST(
     ...(parsed.op === "do" ? { alias: parsed.alias } : {}),
     ...(parsed.op === "twist" ? { x: parsed.x, y: parsed.y, yaw: parsed.yaw } : {}),
   });
-  const control = event ? await appendBodyControl(id, event) : (body.control || []);
+  const control = event ? await appendBodyControl(id, event) : owned.body.control || [];
   return Response.json({
     ok: true,
     queued: true,

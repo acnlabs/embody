@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useAuth0 } from "@auth0/auth0-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { isHostParentOrigin, readHostTokenFromHash } from "@/lib/hostFrame";
 import { AUTH0_AUDIENCE, AUTH0_CLIENT_ID } from "@/lib/auth0";
 import DuckSnapshot from "@/components/DuckSnapshot";
 import DrivePad, { type DriveRequest } from "@/components/DrivePad";
@@ -363,8 +364,21 @@ export function RoomView({
   );
 }
 
-function SignedRoom({ bodyId }: { bodyId: string }) {
-  const auth = useAuth0();
+function OwnedRoom({
+  bodyId,
+  getBearer,
+  enabled,
+  onUnauthorized,
+  showChat,
+  backOnError,
+}: {
+  bodyId: string;
+  getBearer: () => Promise<string | null>;
+  enabled: boolean;
+  onUnauthorized?: () => void;
+  showChat?: boolean;
+  backOnError?: boolean;
+}) {
   const { t } = useI18n();
   const [body, setBody] = useState<BodyShow | null>(null);
   const [poseLive, setPoseLive] = useState<{
@@ -375,18 +389,24 @@ function SignedRoom({ bodyId }: { bodyId: string }) {
   const [chatOpen, setChatOpen] = useState(false);
 
   useEffect(() => {
-    if (!auth.isAuthenticated) return;
+    if (!enabled) return;
     let cancel = false;
     const tick = async () => {
       try {
-        const token = await auth.getAccessTokenSilently({
-          authorizationParams: { audience: AUTH0_AUDIENCE },
-        });
+        const token = await getBearer();
+        if (!token) {
+          if (!cancel) onUnauthorized?.();
+          return;
+        }
         const res = await fetch(`/api/show/${encodeURIComponent(bodyId)}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const json = (await res.json()) as { show?: BodyShow; error?: string };
         if (cancel) return;
+        if (res.status === 401 && onUnauthorized) {
+          onUnauthorized();
+          return;
+        }
         if (!res.ok) setErr(ownerError(json.error || res.statusText, t));
         else {
           setErr("");
@@ -402,19 +422,18 @@ function SignedRoom({ bodyId }: { bodyId: string }) {
       cancel = true;
       clearInterval(timer);
     };
-  }, [auth.isAuthenticated, auth.getAccessTokenSilently, bodyId, t]);
+  }, [enabled, getBearer, bodyId, t, onUnauthorized]);
 
   useEffect(() => {
-    if (!auth.isAuthenticated || !body || !bodyIsLive(body)) {
+    if (!enabled || !body || !bodyIsLive(body)) {
       setPoseLive(null);
       return;
     }
     let cancel = false;
     const tick = async () => {
       try {
-        const token = await auth.getAccessTokenSilently({
-          authorizationParams: { audience: AUTH0_AUDIENCE },
-        });
+        const token = await getBearer();
+        if (!token) return;
         const res = await fetch(`/api/show/${encodeURIComponent(bodyId)}/pose`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -422,7 +441,12 @@ function SignedRoom({ bodyId }: { bodyId: string }) {
           numbers?: Record<string, unknown> | null;
           numbers_error?: string;
         };
-        if (cancel || !res.ok) return;
+        if (cancel) return;
+        if (res.status === 401 && onUnauthorized) {
+          onUnauthorized();
+          return;
+        }
+        if (!res.ok) return;
         setPoseLive({ numbers: json.numbers ?? null, numbers_error: json.numbers_error });
       } catch {
         /* keep last frame */
@@ -434,7 +458,90 @@ function SignedRoom({ bodyId }: { bodyId: string }) {
       cancel = true;
       clearInterval(timer);
     };
-  }, [auth.isAuthenticated, auth.getAccessTokenSilently, bodyId, body?.session_running, body?.drive_listening]);
+  }, [
+    enabled,
+    getBearer,
+    bodyId,
+    body?.session_running,
+    body?.drive_listening,
+    onUnauthorized,
+  ]);
+
+  if (err) {
+    return (
+      <div className="empty">
+        <h3>{t("room.closedTitle")}</h3>
+        <p className="warn">{ownerError(err, t)}</p>
+        {backOnError ? (
+          <p className="meta">
+            <Link href="/">{t("room.back")}</Link>
+          </p>
+        ) : null}
+      </div>
+    );
+  }
+  if (!body) return <p className="meta">{t("room.loading")}</p>;
+  const view: BodyShow = poseLive
+    ? { ...body, numbers: poseLive.numbers, numbers_error: poseLive.numbers_error }
+    : body;
+  const send = async (cmd: DriveRequest): Promise<string | null> => {
+    try {
+      const token = await getBearer();
+      if (!token) {
+        onUnauthorized?.();
+        return t("error.signIn");
+      }
+      const res = await fetch(`/api/show/${encodeURIComponent(bodyId)}/drive`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(cmd),
+      });
+      const json = (await res.json()) as { error?: string; control?: ControlEvent[] };
+      if (res.status === 401 && onUnauthorized) {
+        onUnauthorized();
+        return t("error.signIn");
+      }
+      if (!res.ok) return ownerError(json.error || res.statusText, t);
+      if (Array.isArray(json.control)) {
+        setBody((prev) => (prev ? { ...prev, control: json.control } : prev));
+      }
+      return null;
+    } catch (exc) {
+      return exc instanceof Error ? ownerError(exc.message, t) : t("error.drive");
+    }
+  };
+  return (
+    <>
+      <RoomView
+        body={view}
+        send={send}
+        onChat={showChat ? () => setChatOpen(true) : undefined}
+      />
+      {showChat ? (
+        <InterfazeChatDock
+          agentId={body.bound_agent_id}
+          agentName={agentLabel(body)}
+          bodyId={body.id}
+          open={chatOpen}
+          onClose={() => setChatOpen(false)}
+        />
+      ) : null}
+    </>
+  );
+}
+
+function SignedRoom({ bodyId }: { bodyId: string }) {
+  const auth = useAuth0();
+  const { t } = useI18n();
+  const getBearer = useCallback(async () => {
+    if (!auth.isAuthenticated) return null;
+    return auth.getAccessTokenSilently({
+      authorizationParams: { audience: AUTH0_AUDIENCE },
+    });
+  }, [auth.isAuthenticated, auth.getAccessTokenSilently]);
 
   if (auth.isLoading) return <p className="meta">{t("home.loadingAuth")}</p>;
   if (!auth.isAuthenticated) {
@@ -454,60 +561,71 @@ function SignedRoom({ bodyId }: { bodyId: string }) {
       </div>
     );
   }
-  if (err) {
-    return (
-      <div className="empty">
-        <h3>{t("room.closedTitle")}</h3>
-        <p className="warn">{ownerError(err, t)}</p>
-        <p className="meta">
-          <Link href="/">{t("room.back")}</Link>
-        </p>
-      </div>
-    );
-  }
-  if (!body) return <p className="meta">{t("room.loading")}</p>;
-  const view: BodyShow = poseLive
-    ? { ...body, numbers: poseLive.numbers, numbers_error: poseLive.numbers_error }
-    : body;
-  const send = async (cmd: DriveRequest): Promise<string | null> => {
-    try {
-      const token = await auth.getAccessTokenSilently({
-        authorizationParams: { audience: AUTH0_AUDIENCE },
-      });
-      const res = await fetch(`/api/show/${encodeURIComponent(bodyId)}/drive`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(cmd),
-      });
-      const json = (await res.json()) as { error?: string; control?: ControlEvent[] };
-      if (!res.ok) return ownerError(json.error || res.statusText, t);
-      if (Array.isArray(json.control)) {
-        setBody((prev) => (prev ? { ...prev, control: json.control } : prev));
-      }
-      return null;
-    } catch (exc) {
-      return exc instanceof Error ? ownerError(exc.message, t) : t("error.drive");
-    }
-  };
   return (
-    <>
-      <RoomView body={view} send={send} onChat={() => setChatOpen(true)} />
-      <InterfazeChatDock
-        agentId={body.bound_agent_id}
-        agentName={agentLabel(body)}
-        bodyId={body.id}
-        open={chatOpen}
-        onClose={() => setChatOpen(false)}
-      />
-    </>
+    <OwnedRoom bodyId={bodyId} getBearer={getBearer} enabled showChat backOnError />
   );
 }
 
-export default function BodyRoom({ bodyId }: { bodyId: string }) {
+function notifyHostExpired() {
+  try {
+    const origin = document.referrer ? new URL(document.referrer).origin : "";
+    if (window.parent !== window && isHostParentOrigin(origin)) {
+      window.parent.postMessage({ type: "talk:expired" }, origin);
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+function HostRoom({ bodyId }: { bodyId: string }) {
   const { t } = useI18n();
+  const [token, setToken] = useState("");
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const th = readHostTokenFromHash(window.location.hash);
+    if (th) setToken(th);
+    setReady(true);
+    document.documentElement.classList.add("embody-host");
+    const onMessage = (ev: MessageEvent) => {
+      if (!isHostParentOrigin(ev.origin)) return;
+      const data = ev.data as { type?: string; hostToken?: string };
+      if (data?.type === "talk:session" && typeof data.hostToken === "string" && data.hostToken.trim()) {
+        setToken(data.hostToken.trim());
+      }
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
+
+  const getBearer = useCallback(async () => token || null, [token]);
+  const onUnauthorized = useCallback(() => {
+    setToken("");
+    notifyHostExpired();
+  }, []);
+
+  if (!ready) return <p className="meta">{t("room.loading")}</p>;
+  if (!token) {
+    return (
+      <div className="empty">
+        <h3>{t("host.expiredTitle")}</h3>
+        <p>{t("host.expiredHint")}</p>
+      </div>
+    );
+  }
+  return (
+    <OwnedRoom
+      bodyId={bodyId}
+      getBearer={getBearer}
+      enabled
+      onUnauthorized={onUnauthorized}
+    />
+  );
+}
+
+export default function BodyRoom({ bodyId, host }: { bodyId: string; host?: boolean }) {
+  const { t } = useI18n();
+  if (host) return <HostRoom bodyId={bodyId} />;
   if (!AUTH0_CLIENT_ID) {
     return (
       <>
