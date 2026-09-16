@@ -1,4 +1,5 @@
-import { OWNER_ERR } from "@/lib/copy";
+import { bodyIsLive, OWNER_ERR } from "@/lib/copy";
+import { isDriveListening } from "@/lib/drive";
 import {
   hostCorsHeaders,
   hostPath,
@@ -7,9 +8,34 @@ import {
 import { mintHostToken } from "@/lib/hostToken";
 import { listBodiesForAgents } from "@/lib/ledger";
 import { bareAgentId, fetchMyAgents } from "@/lib/myAgents";
+import type { BodyShow } from "@/lib/types";
 import { extractBearerToken, verifyUserToken } from "@/lib/userAuth";
 
 export const runtime = "nodejs";
+
+function bodyIsOn(row: BodyShow): boolean {
+  return bodyIsLive({
+    session_running: row.session_running,
+    drive_listening: isDriveListening(row.drive_listen_at),
+  });
+}
+
+function pickList(bodies: BodyShow[]) {
+  return bodies
+    .slice()
+    .sort(
+      (a, b) =>
+        Number(bodyIsOn(b)) - Number(bodyIsOn(a)) ||
+        (b.pushed_at || "").localeCompare(a.pushed_at || "") ||
+        b.id.localeCompare(a.id),
+    )
+    .map((row) => ({
+      id: row.id,
+      name: row.name || row.id,
+      origin: row.origin,
+      live: bodyIsOn(row),
+    }));
+}
 
 function corsJson(body: unknown, status: number, origin: string): Response {
   return Response.json(body, {
@@ -68,11 +94,12 @@ export async function POST(req: Request) {
   const bodies = (await listBodiesForAgents(mine.map((row) => row.id))).filter(
     (row) => bareAgentId(row.bound_agent_id) === agentId,
   );
+  if (!wantedId && bodies.length > 1) {
+    return corsJson({ ok: true, pick: true, agentId, bodies: pickList(bodies) }, 200, origin);
+  }
   const picked = wantedId
     ? bodies.find((row) => row.id === wantedId)
-    : bodies
-        .slice()
-        .sort((a, b) => (b.pushed_at || "").localeCompare(a.pushed_at || "") || b.id.localeCompare(a.id))[0];
+    : bodies[0];
   if (!picked) {
     return corsJson(
       { ok: false, error: "This agent has no body yet.", code: "no_body" },
